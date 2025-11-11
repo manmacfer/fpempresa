@@ -151,7 +151,7 @@ function submit(){
       link_github: emptyToNull(d.link_github),
       link_video: emptyToNull(d.link_video),
     }))
-    .patch(route('students.update.me'), { forceFormData: true })
+    .post(route('students.update.me'), { forceFormData: true })
 }
 
 // ===== Formación (CRUD con modales) =====

@@ -28,7 +28,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- PERFIL ALUMNO (sin ID) ---
     Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
-    Route::patch('/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
+    Route::match(['post','patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
 
     // Perfil público
     Route::get('/students/public/{student}', [StudentController::class, 'publicShow'])->name('students.public.show');

@@ -6,6 +6,7 @@ use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Log;
 
 class StudentController extends Controller
 {
@@ -14,8 +15,8 @@ class StudentController extends Controller
         $student = Student::firstOrCreate(['user_id' => $request->user()->id]);
 
         $student->load([
-            'educations'  => fn($q) => $q->orderBy('start_date','desc'),
-            'experiences' => fn($q) => $q->orderBy('start_date','desc'),
+            'educations'  => fn($q) => $q->orderBy('start_date', 'desc'),
+            'experiences' => fn($q) => $q->orderBy('start_date', 'desc'),
         ]);
 
         return Inertia::render('Students/Edit', [
@@ -27,73 +28,76 @@ class StudentController extends Controller
     {
         $student = Student::firstOrCreate(['user_id' => $request->user()->id]);
 
+        // Log para ver exactamente qué llega (útil si algo sigue sin guardarse)
+        Log::info('students.update.me payload', $request->all());
+
         $data = $request->validate([
-            // personales
-            'dni'                 => ['nullable','string','max:50'],
-            'phone'               => ['nullable','string','max:50'],
-            'birth_date'          => ['nullable','date'],
-            'address'             => ['nullable','string','max:255'],
-            'postal_code'         => ['nullable','string','max:20'],
-            'city'                => ['nullable','string','max:100'],
-            'has_driver_license'  => ['nullable','boolean'],
-            'has_vehicle'         => ['nullable','boolean'],
+            // personales / contacto
+            'dni'                 => ['nullable', 'string', 'max:50'],
+            'phone'               => ['nullable', 'string', 'max:50'],
+            'birth_date'          => ['nullable', 'date'],
+            'address'             => ['nullable', 'string', 'max:255'],
+            'postal_code'         => ['nullable', 'string', 'max:20'],
+            'city'                => ['nullable', 'string', 'max:100'],
+            'has_driver_license'  => ['nullable', 'boolean'],
+            'has_vehicle'         => ['nullable', 'boolean'],
 
             // académicos
-            'cycle'               => ['nullable','string','max:20'],
-            'center'              => ['nullable','string','max:255'],
-            'year_start'          => ['nullable','integer'],
-            'year_end'            => ['nullable','integer'],
-            'fp_modality'         => ['nullable','in:dual,general'],
+            'cycle'               => ['nullable', 'string', 'max:20'],
+            'center'              => ['nullable', 'string', 'max:255'],
+            'year_start'          => ['nullable', 'integer'],
+            'year_end'            => ['nullable', 'integer'],
+            'fp_modality'         => ['nullable', 'in:dual,general'],
 
             // disponibilidad
-            'availability_slot'   => ['nullable','in:morning,afternoon,both'],
-            'commitments'         => ['nullable','array'],
+            'availability_slot'   => ['nullable', 'in:morning,afternoon,both'],
+            'commitments'         => ['nullable', 'array'],
             'commitments.*'       => ['string'],
-            'relocate'            => ['nullable','boolean'],
-            'relocate_cities'     => ['nullable','array'],
+            'relocate'            => ['nullable', 'boolean'],
+            'relocate_cities'     => ['nullable', 'array'],
             'relocate_cities.*'   => ['string'],
-            'transport_own'       => ['nullable','boolean'],
-            'work_modality'       => ['nullable','in:presencial,remota,hibrida'],
-            'remote_days'         => ['nullable','integer','min:0','max:7'],
-            'days_per_week'       => ['nullable','integer','min:1','max:7'],
-            'available_from'      => ['nullable','date'],
+            'transport_own'       => ['nullable', 'boolean'],
+            'work_modality'       => ['nullable', 'in:presencial,remota,hibrida'],
+            'remote_days'         => ['nullable', 'integer', 'min:0', 'max:7'],
+            'days_per_week'       => ['nullable', 'integer', 'min:1', 'max:7'],
+            'available_from'      => ['nullable', 'date'],
 
             // intereses / perfil
-            'sectors'                 => ['nullable','array'],
+            'sectors'                 => ['nullable', 'array'],
             'sectors.*'               => ['string'],
-            'preferred_company_type'  => ['nullable','string','max:255'],
-            'non_formal_experience'   => ['nullable','string','max:255'],
-            'tech_competencies'       => ['nullable','array'],
+            'preferred_company_type'  => ['nullable', 'string', 'max:255'],
+            'non_formal_experience'   => ['nullable', 'string', 'max:255'],
+            'tech_competencies'       => ['nullable', 'array'],
             'tech_competencies.*'     => ['string'],
-            'soft_skills'             => ['nullable','array'],
+            'soft_skills'             => ['nullable', 'array'],
             'soft_skills.*'           => ['string'],
-            'languages'               => ['nullable','array'],
-            'languages.*.name'        => ['required_with:languages','string','max:100'],
-            'languages.*.level'       => ['nullable','string','max:50'],
-            'certifications'          => ['nullable','array'],
+            'languages'               => ['nullable', 'array'],
+            'languages.*.name'        => ['required_with:languages', 'string', 'max:100'],
+            'languages.*.level'       => ['nullable', 'string', 'max:50'],
+            'certifications'          => ['nullable', 'array'],
             'certifications.*'        => ['string'],
 
             // extra
-            'hobbies'             => ['nullable','string','max:255'],
-            'clubs'               => ['nullable','string','max:255'],
-            'align_activities'    => ['nullable','boolean'],
-            'entrepreneurship'    => ['nullable','string'],
+            'hobbies'             => ['nullable', 'string', 'max:255'],
+            'clubs'               => ['nullable', 'string', 'max:255'],
+            'align_activities'    => ['nullable', 'boolean'],
+            'entrepreneurship'    => ['nullable', 'string'],
 
             // links
-            'link_linkedin'       => ['nullable','url'],
-            'link_portfolio'      => ['nullable','url'],
-            'link_github'         => ['nullable','url'],
-            'link_video'          => ['nullable','url'],
+            'link_linkedin'       => ['nullable', 'url'],
+            'link_portfolio'      => ['nullable', 'url'],
+            'link_github'         => ['nullable', 'url'],
+            'link_video'          => ['nullable', 'url'],
 
             // ficheros
-            'avatar'              => ['nullable','file','mimes:jpg,jpeg,png','max:2048'],
-            'cv'                  => ['nullable','file','mimes:pdf,doc,docx','max:8192'],
-            'cover_letter'        => ['nullable','file','mimes:pdf,doc,docx','max:8192'],
-            'other_certs'         => ['nullable','array'],
-            'other_certs.*'       => ['file','mimes:pdf,jpg,jpeg,png','max:8192'],
+            'avatar'              => ['nullable', 'file', 'mimes:jpg,jpeg,png', 'max:2048'],
+            'cv'                  => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:8192'],
+            'cover_letter'        => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:8192'],
+            'other_certs'         => ['nullable', 'array'],
+            'other_certs.*'       => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:8192'],
         ]);
 
-        // Ficheros
+        // Subida de ficheros (si vienen)
         if ($request->hasFile('avatar')) {
             if ($student->avatar_path) Storage::disk('public')->delete($student->avatar_path);
             $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
@@ -114,19 +118,19 @@ class StudentController extends Controller
             $data['other_certs_paths'] = $paths;
         }
 
-        // Guarda (update directo) y redirige para refrescar props
-        $student->update($data);
+        // Guarda todo y lanza excepción si algo falla
+        $student->fill($data);
+        $student->saveOrFail();
 
-        return redirect()
-            ->route('students.edit.me')
-            ->with('success', 'Perfil guardado.');
+        return redirect()->route('students.edit.me')->with('success', 'Perfil guardado.');
     }
+
 
     public function publicShow(Student $student)
     {
         $student->load([
-            'educations'  => fn($q) => $q->orderBy('start_date','desc'),
-            'experiences' => fn($q) => $q->orderBy('start_date','desc'),
+            'educations'  => fn($q) => $q->orderBy('start_date', 'desc'),
+            'experiences' => fn($q) => $q->orderBy('start_date', 'desc'),
         ]);
 
         return Inertia::render('Students/PublicShow', [
@@ -199,7 +203,7 @@ class StudentController extends Controller
                 'start_date'   => optional($x->start_date)?->format('Y-m-d'),
                 'end_date'     => optional($x->end_date)?->format('Y-m-d'),
                 'functions'    => $x->functions,
-                'is_non_formal'=> $x->is_non_formal,
+                'is_non_formal' => $x->is_non_formal,
             ])->values(),
         ];
     }
