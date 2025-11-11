@@ -11,7 +11,7 @@ import ToggleThemeButton from '@/Components/ToggleThemeButton.vue'
         <div class="flex items-center gap-2">
           <ToggleThemeButton />
           <Link href="/dashboard" class="text-sm text-gray-600 hover:underline dark:text-gray-300">
-            Ir al dashboard
+            Inicio
           </Link>
         </div>
       </div>

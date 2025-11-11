@@ -31,7 +31,7 @@ const myPublicRoute = computed(() => {
       <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         <div class="flex items-center gap-6">
           <Link :href="route('dashboard')" class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            FP+Empresa
+            FP Empresa
           </Link>
 
           <!-- Menú por rol -->
@@ -60,7 +60,7 @@ const myPublicRoute = computed(() => {
 
         <div class="flex items-center gap-4">
           <Link :href="myEditorRoute" class="hidden md:inline-flex px-3 py-1.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
-            Mi perfil
+            Editar mi perfil
           </Link>
 
           <Link :href="myPublicRoute" class="text-sm text-gray-700 dark:text-gray-200 hover:text-indigo-600">
