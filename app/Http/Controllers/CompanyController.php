@@ -1,81 +1,54 @@
 <?php
 
-
 namespace App\Http\Controllers;
-
 
 use App\Models\Company;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
-
 
 class CompanyController extends Controller
 {
-public function editMe(Request $request)
-{
-$company = Company::firstOrCreate(['user_id' => $request->user()->id], [
-'name' => $request->user()->name,
-]);
+    public function editMe(Request $request)
+    {
+        $company = $request->user()->company()->firstOrFail();
 
+        return Inertia::render('Companies/Edit', [
+            'company' => $company,
+        ]);
+    }
 
-return Inertia::render('Companies/Edit', [
-'company' => [
-'id' => $company->id,
-'name' => $company->name,
-'city' => $company->city,
-'website' => $company->website,
-'description' => $company->description,
-'sectors' => $company->sectors ?? [],
-'avatar_url' => $company->avatar_url,
-'user_name' => $request->user()->name,
-],
-]);
-}
+    public function updateMe(Request $request)
+    {
+        $company = $request->user()->company()->firstOrFail();
 
+        $data = $request->validate([
+            'legal_name'    => ['nullable','string','max:255'],
+            'trade_name'    => ['nullable','string','max:255'],
+            'cif'           => ['nullable','string','max:20'],
+            'sector'        => ['nullable','string','max:255'],
+            'website'       => ['nullable','url'],
+            'linkedin'      => ['nullable','url'],
+            'phone'         => ['nullable','string','max:30'],
+            'city'          => ['nullable','string','max:255'],
+            'province'      => ['nullable','string','max:255'],
+            'postal_code'   => ['nullable','string','max:15'],
+            'contact_name'  => ['nullable','string','max:255'],
+            'contact_email' => ['nullable','email','max:255'],
+            'description'   => ['nullable','string'],
+        ]);
 
-public function updateMe(Request $request)
-{
-$company = Company::firstOrCreate(['user_id' => $request->user()->id]);
+        $company->update($data);
 
+        return back()->with('success', 'Perfil de empresa actualizado.');
+    }
 
-$data = $request->validate([
-'name' => ['required','string','max:255'],
-'city' => ['nullable','string','max:100'],
-'website' => ['nullable','url'],
-'description' => ['nullable','string'],
-'sectors' => ['nullable','array'],
-'sectors.*' => ['string'],
-'avatar' => ['nullable','file','mimes:jpg,jpeg,png','max:2048'],
-]);
-
-
-if ($request->hasFile('avatar')) {
-if ($company->avatar_path) Storage::disk('public')->delete($company->avatar_path);
-$data['avatar_path'] = $request->file('avatar')->store('company_avatars', 'public');
-}
-
-
-$company->fill($data);
-$company->saveOrFail();
-
-
-return redirect()->route('companies.edit.me')->with('success', 'Perfil de empresa guardado.');
-}
-
-
-public function publicShow(Company $company)
-{
-return Inertia::render('Companies/PublicShow', [
-'company' => [
-'id' => $company->id,
-'name' => $company->name,
-'city' => $company->city,
-'website' => $company->website,
-'description' => $company->description,
-'sectors' => $company->sectors ?? [],
-'avatar_url' => $company->avatar_url,
-],
-]);
-}
+    public function publicShow(Company $company)
+    {
+        return Inertia::render('Companies/PublicShow', [
+            'company' => $company->only([
+                'id','trade_name','legal_name','sector','website','linkedin',
+                'city','province','description'
+            ]),
+        ]);
+    }
 }
