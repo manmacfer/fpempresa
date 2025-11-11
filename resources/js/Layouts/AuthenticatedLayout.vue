@@ -37,7 +37,7 @@ const showingNavigationDropdown = ref(false)
               Vacantes
             </Link>
 
-            <!-- Solo muestra Matchings si la ruta existe -->
+            <!-- Matchings (si existe la ruta) -->
             <Link
               v-if="route().has && route().has('matchings.index')"
               :href="route('matchings.index')"
@@ -48,24 +48,36 @@ const showingNavigationDropdown = ref(false)
             >
               Matchings
             </Link>
+
+            <!-- Mi perfil (edición del alumno) -->
+            <Link
+              v-if="route().has && route().has('students.edit')"
+              :href="route('students.edit')"
+              class="text-sm rounded-lg px-3 py-2 font-medium
+                     text-gray-600 hover:text-gray-900 hover:bg-gray-50
+                     dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/70"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('students.edit') }"
+            >
+              Mi perfil
+            </Link>
           </div>
 
           <!-- DERECHA: tema + usuario -->
           <div class="hidden sm:flex items-center gap-3">
-            <!-- 👇 Botón Modo Día/Noche -->
+            <!-- Botón Modo Día/Noche -->
             <ToggleThemeButton class="me-1" />
 
             <span class="text-sm text-gray-600 dark:text-gray-300">
               {{ $page.props.auth?.user?.name || 'Usuario' }}
             </span>
 
-            <!-- Solo enlaza al perfil si la ruta existe -->
+            <!-- Perfil de cuenta Breeze (opcional) -->
             <Link
               v-if="route().has && route().has('profile.edit')"
               :href="route('profile.edit')"
               class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
             >
-              Perfil
+              Cuenta
             </Link>
 
             <Link
@@ -117,6 +129,7 @@ const showingNavigationDropdown = ref(false)
                        dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/70">
             Dashboard
           </Link>
+
           <Link :href="route('vacancies.index')"
                 class="block ps-3 pe-4 py-2 text-base font-medium
                        text-gray-600 hover:text-gray-800 hover:bg-gray-50
@@ -131,6 +144,15 @@ const showingNavigationDropdown = ref(false)
                    text-gray-600 hover:text-gray-800 hover:bg-gray-50
                    dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/70">
             Matchings
+          </Link>
+
+          <Link
+            v-if="route().has && route().has('students.edit')"
+            :href="route('students.edit')"
+            class="block ps-3 pe-4 py-2 text-base font-medium
+                   text-gray-600 hover:text-gray-800 hover:bg-gray-50
+                   dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/70">
+            Mi perfil
           </Link>
         </div>
 
@@ -150,7 +172,7 @@ const showingNavigationDropdown = ref(false)
               :href="route('profile.edit')"
               class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
             >
-              Perfil
+              Cuenta
             </Link>
             <Link
               v-if="route().has && route().has('logout')"
