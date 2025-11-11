@@ -13,26 +13,20 @@ class Student extends Model
 
     protected $fillable = [
         'user_id',
-        'full_name',      // heredado en tu BD
-        'ciclo',          // <-- heredado en tu BD (español)
-        // PERSONALES / CONTACTO
-        'phone','dni','birth_date','address','postal_code','city','has_driver_license','has_vehicle',
-        // ACADÉMICOS (ciclo actual)
-        'cycle','center','year_start','year_end','fp_modality', // 'cycle' es el nombre “nuevo” en inglés (si existe)
-        // DISPONIBILIDAD
-        'availability_slot','commitments','relocate','relocate_cities','transport_own',
-        'work_modality','remote_days','days_per_week','available_from',
-        // INTERESES / COMPETENCIAS / IDIOMAS
-        'sectors','preferred_company_type','non_formal_experience',
-        'tech_competencies','soft_skills','languages','certifications',
-        // EXTRA
-        'hobbies','clubs','motivation','limitations',
-        // LINKS
+        // Personales / contacto
+        'dni','phone','birth_date','address','postal_code','city','has_driver_license','has_vehicle',
+        // Académicos
+        'cycle','center','year_start','year_end','fp_modality',
+        // Disponibilidad
+        'availability_slot','commitments','relocate','relocate_cities','transport_own','work_modality','remote_days','days_per_week','available_from',
+        // Intereses / perfil
+        'sectors','preferred_company_type','non_formal_experience','tech_competencies','soft_skills','languages','certifications',
+        // Extra
+        'hobbies','clubs','align_activities','entrepreneurship',
+        // Links
         'link_linkedin','link_portfolio','link_github','link_video',
-        // ARCHIVOS
-        'cv_path','cover_letter_path','other_cert_paths',
-        // AVATAR
-        'avatar_path',
+        // Archivos
+        'cv_path','cover_letter_path','other_cert_paths','avatar_path',
     ];
 
     protected $casts = [
@@ -40,8 +34,6 @@ class Student extends Model
         'available_from'     => 'date',
         'has_driver_license' => 'boolean',
         'has_vehicle'        => 'boolean',
-        'year_start'         => 'integer',
-        'year_end'           => 'integer',
         'commitments'        => 'array',
         'relocate'           => 'boolean',
         'relocate_cities'    => 'array',
@@ -51,8 +43,9 @@ class Student extends Model
         'sectors'            => 'array',
         'tech_competencies'  => 'array',
         'soft_skills'        => 'array',
-        'languages'          => 'array',
+        'languages'          => 'array',   // [{name, level}]
         'certifications'     => 'array',
+        'align_activities'   => 'boolean',
         'other_cert_paths'   => 'array',
     ];
 

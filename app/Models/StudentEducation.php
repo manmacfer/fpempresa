@@ -13,11 +13,7 @@ class StudentEducation extends Model
     protected $table = 'student_educations';
 
     protected $fillable = [
-        'student_id',
-        'title',
-        'center',
-        'start_date',
-        'end_date',
+        'student_id','title','center','start_date','end_date',
     ];
 
     protected $casts = [
