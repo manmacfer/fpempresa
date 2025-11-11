@@ -49,10 +49,10 @@ const showingNavigationDropdown = ref(false)
               Matchings
             </Link>
 
-            <!-- Mi perfil (edición del alumno) -->
+            <!-- Mi perfil (edición) => requiere parámetro -->
             <Link
-              v-if="route().has && route().has('students.edit')"
-              :href="route('students.edit')"
+              v-if="route().has && route().has('students.edit') && $page.props.auth?.studentId"
+              :href="route('students.edit', $page.props.auth.studentId)"
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:text-gray-900 hover:bg-gray-50
                      dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/70"
@@ -64,14 +64,20 @@ const showingNavigationDropdown = ref(false)
 
           <!-- DERECHA: tema + usuario -->
           <div class="hidden sm:flex items-center gap-3">
-            <!-- Botón Modo Día/Noche -->
             <ToggleThemeButton class="me-1" />
 
-            <span class="text-sm text-gray-600 dark:text-gray-300">
-              {{ $page.props.auth?.user?.name || 'Usuario' }}
+            <!-- Nombre → enlace al perfil público si hay studentId -->
+            <Link
+              v-if="route().has && route().has('students.public.show') && $page.props.auth?.studentId"
+              :href="route('students.public.show', $page.props.auth.studentId)"
+              class="text-sm text-gray-600 dark:text-gray-300 hover:underline"
+            >
+              {{ ($page.props.auth?.user?.name || 'Usuario').split(' ')[0] }}
+            </Link>
+            <span v-else class="text-sm text-gray-600 dark:text-gray-300">
+              {{ ($page.props.auth?.user?.name || 'Usuario').split(' ')[0] }}
             </span>
 
-            <!-- Perfil de cuenta Breeze (opcional) -->
             <Link
               v-if="route().has && route().has('profile.edit')"
               :href="route('profile.edit')"
@@ -116,7 +122,6 @@ const showingNavigationDropdown = ref(false)
 
       <!-- MENÚ MÓVIL -->
       <div class="sm:hidden" :class="{ 'block': showingNavigationDropdown, 'hidden': !showingNavigationDropdown }">
-        <!-- Fila con el botón de Tema en móvil -->
         <div class="px-4 pb-2 pt-3 flex items-center justify-between">
           <span class="text-sm text-gray-600 dark:text-gray-300">Tema</span>
           <ToggleThemeButton />
@@ -146,9 +151,10 @@ const showingNavigationDropdown = ref(false)
             Matchings
           </Link>
 
+          <!-- Mi perfil móvil (con parámetro) -->
           <Link
-            v-if="route().has && route().has('students.edit')"
-            :href="route('students.edit')"
+            v-if="route().has && route().has('students.edit') && $page.props.auth?.studentId"
+            :href="route('students.edit', $page.props.auth.studentId)"
             class="block ps-3 pe-4 py-2 text-base font-medium
                    text-gray-600 hover:text-gray-800 hover:bg-gray-50
                    dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-800/70">
@@ -159,7 +165,17 @@ const showingNavigationDropdown = ref(false)
         <div class="border-t border-gray-200 pb-1 pt-4 dark:border-gray-800">
           <div class="px-4">
             <div class="text-base font-medium text-gray-800 dark:text-gray-100">
-              {{ $page.props.auth?.user?.name || 'Usuario' }}
+              <!-- Nombre → enlace al público si hay studentId -->
+              <Link
+                v-if="route().has && route().has('students.public.show') && $page.props.auth?.studentId"
+                :href="route('students.public.show', $page.props.auth.studentId)"
+                class="hover:underline"
+              >
+                {{ ($page.props.auth?.user?.name || 'Usuario').split(' ')[0] }}
+              </Link>
+              <span v-else>
+                {{ ($page.props.auth?.user?.name || 'Usuario').split(' ')[0] }}
+              </span>
             </div>
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
               {{ $page.props.auth?.user?.email || '' }}
