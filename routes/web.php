@@ -26,9 +26,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('matchings/{matching}/reject', [MatchingController::class, 'reject'])
         ->name('matchings.reject');
 
-    // Página PÚBLICA del alumno (no requiere login)
-    Route::get('/alumnos/{student}', [StudentController::class, 'publicShow'])
-        ->name('students.public.show');
+    Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
+    Route::patch('/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
+
+    Route::get('/students/public/{student}', [StudentController::class, 'publicShow'])->name('students.public.show');
+
+    // (Opcional si mantienes resource)
+    Route::resource('students', StudentController::class)->only(['edit', 'update', 'show']);
 });
 
 require __DIR__ . '/auth.php';
