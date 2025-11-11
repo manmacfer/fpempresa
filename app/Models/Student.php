@@ -13,10 +13,12 @@ class Student extends Model
 
     protected $fillable = [
         'user_id',
+        'full_name',      // heredado en tu BD
+        'ciclo',          // <-- heredado en tu BD (español)
         // PERSONALES / CONTACTO
         'phone','dni','birth_date','address','postal_code','city','has_driver_license','has_vehicle',
         // ACADÉMICOS (ciclo actual)
-        'cycle','center','year_start','year_end','fp_modality',
+        'cycle','center','year_start','year_end','fp_modality', // 'cycle' es el nombre “nuevo” en inglés (si existe)
         // DISPONIBILIDAD
         'availability_slot','commitments','relocate','relocate_cities','transport_own',
         'work_modality','remote_days','days_per_week','available_from',
@@ -49,7 +51,7 @@ class Student extends Model
         'sectors'            => 'array',
         'tech_competencies'  => 'array',
         'soft_skills'        => 'array',
-        'languages'          => 'array',   // [{name, level}]
+        'languages'          => 'array',
         'certifications'     => 'array',
         'other_cert_paths'   => 'array',
     ];

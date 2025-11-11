@@ -5,32 +5,49 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;   // <-- IMPORTANTE para detectar columnas
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class StudentController extends Controller
 {
-    /**
-     * EDITAR MI PERFIL (sin ID)
-     */
     public function editMe(Request $request)
     {
-        $student = Student::firstOrCreate(['user_id' => Auth::id()]);
+        // Defaults al crear: full_name y, si existe 'ciclo' (legacy NOT NULL), poner placeholder
+        $defaults = ['full_name' => Auth::user()?->name];
+
+        $usesCiclo = Schema::hasColumn('students', 'ciclo') && !Schema::hasColumn('students', 'cycle');
+        if ($usesCiclo) {
+            // Como 'ciclo' es NOT NULL en tu BD, ponemos un valor inicial seguro
+            $defaults['ciclo'] = 'PENDIENTE';
+        }
+
+        $student = Student::firstOrCreate(['user_id' => Auth::id()], $defaults);
 
         return Inertia::render('Students/Edit', [
             'student' => $this->toResource($student),
         ]);
     }
 
-    /**
-     * ACTUALIZAR MI PERFIL (sin ID)
-     */
     public function updateMe(Request $request)
     {
-        $student = Student::firstOrCreate(['user_id' => Auth::id()]);
+        $defaults = ['full_name' => Auth::user()?->name];
+        $usesCiclo = Schema::hasColumn('students', 'ciclo') && !Schema::hasColumn('students', 'cycle');
+        if ($usesCiclo) {
+            $defaults['ciclo'] = 'PENDIENTE';
+        }
+
+        $student = Student::firstOrCreate(['user_id' => Auth::id()], $defaults);
+
         $data = $this->validated($request);
 
-        // Avatar opcional
+        // Si la BD usa 'ciclo' (y no 'cycle'), mapeamos el valor
+        if ($usesCiclo && array_key_exists('cycle', $data)) {
+            $data['ciclo'] = $data['cycle'];
+            unset($data['cycle']);
+        }
+
+        // Avatar
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('avatars', 'public');
             $data['avatar_path'] = $path;
@@ -41,9 +58,6 @@ class StudentController extends Controller
         return back()->with('success', 'Perfil actualizado.');
     }
 
-    /**
-     * EDITAR POR ID (útil para admin o si mantienes la ruta resource)
-     */
     public function edit(Student $student)
     {
         $this->ensureOwnerOrAbort($student);
@@ -53,13 +67,17 @@ class StudentController extends Controller
         ]);
     }
 
-    /**
-     * ACTUALIZAR POR ID (útil para admin o si mantienes la ruta resource)
-     */
     public function update(Request $request, Student $student)
     {
         $this->ensureOwnerOrAbort($student);
+
         $data = $this->validated($request);
+
+        $usesCiclo = Schema::hasColumn('students', 'ciclo') && !Schema::hasColumn('students', 'cycle');
+        if ($usesCiclo && array_key_exists('cycle', $data)) {
+            $data['ciclo'] = $data['cycle'];
+            unset($data['cycle']);
+        }
 
         if ($request->hasFile('avatar')) {
             $path = $request->file('avatar')->store('avatars', 'public');
@@ -71,9 +89,6 @@ class StudentController extends Controller
         return back()->with('success', 'Perfil actualizado.');
     }
 
-    /**
-     * PERFIL PÚBLICO
-     */
     public function publicShow(Student $student)
     {
         return Inertia::render('Students/PublicShow', [
@@ -81,9 +96,6 @@ class StudentController extends Controller
         ]);
     }
 
-    /**
-     * Validación de TODOS los campos del nuevo perfil
-     */
     private function validated(Request $request): array
     {
         return $request->validate([
@@ -97,8 +109,8 @@ class StudentController extends Controller
             'has_driver_license' => ['nullable','boolean'],
             'has_vehicle'        => ['nullable','boolean'],
 
-            // ACADÉMICOS (ciclo actual)
-            'cycle'              => ['nullable','string','max:190'],
+            // ACADÉMICOS
+            'cycle'              => ['nullable','string','max:190'], // en el front usamos 'cycle'
             'center'             => ['nullable','string','max:190'],
             'year_start'         => ['nullable','integer','between:1990,2100'],
             'year_end'           => ['nullable','integer','between:1990,2100'],
@@ -122,50 +134,42 @@ class StudentController extends Controller
             'sectors.*'             => ['nullable','string','max:190'],
             'preferred_company_type'=> ['nullable','string','max:190'],
             'non_formal_experience' => ['nullable','string'],
-
-            'tech_competencies'  => ['nullable','array'],
-            'tech_competencies.*'=> ['nullable','string','max:190'],
-            'soft_skills'        => ['nullable','array'],
-            'soft_skills.*'      => ['nullable','string','max:190'],
-
-            'languages'          => ['nullable','array'], // [{name,level}]
-            'languages.*.name'   => ['required_with:languages','string','max:100'],
-            'languages.*.level'  => ['nullable','string','max:50'],
-
-            'certifications'     => ['nullable','array'],
-            'certifications.*'   => ['nullable','string','max:190'],
+            'tech_competencies'     => ['nullable','array'],
+            'tech_competencies.*'   => ['nullable','string','max:190'],
+            'soft_skills'           => ['nullable','array'],
+            'soft_skills.*'         => ['nullable','string','max:190'],
+            'languages'             => ['nullable','array'],
+            'languages.*.name'      => ['required_with:languages','string','max:100'],
+            'languages.*.level'     => ['nullable','string','max:50'],
+            'certifications'        => ['nullable','array'],
+            'certifications.*'      => ['nullable','string','max:190'],
 
             // EXTRA / LINKS
             'hobbies'            => ['nullable','string'],
             'clubs'              => ['nullable','string'],
             'motivation'         => ['nullable','string'],
             'limitations'        => ['nullable','string'],
-
             'link_linkedin'      => ['nullable','url','max:255'],
             'link_portfolio'     => ['nullable','url','max:255'],
             'link_github'        => ['nullable','url','max:255'],
             'link_video'         => ['nullable','url','max:255'],
 
-            // ARCHIVOS (para el futuro; avatar ya activo)
+            // ARCHIVOS
             'avatar'             => ['nullable','image','max:2048'],
-            // 'cv_pdf'          => ['nullable','mimetypes:application/pdf','max:4096'],
-            // 'cover_letter_pdf'=> ['nullable','mimetypes:application/pdf','max:4096'],
-            // 'other_certs.*'   => ['nullable','file','max:4096'],
         ]);
     }
 
-    /**
-     * Serialización uniforme para el front
-     */
     private function toResource(Student $s): array
     {
+        // Leemos 'cycle' o 'ciclo' indistintamente para el front
+        $cycleValue = $s->cycle ?? $s->ciclo ?? null;
+
         return [
             'id'                   => $s->id,
             'name'                 => optional($s->user)->name,
             'email'                => optional($s->user)->email,
             'avatar_url'           => $s->avatar_path ? Storage::url($s->avatar_path) : null,
 
-            // PERSONALES / CONTACTO
             'phone'                => $s->phone,
             'dni'                  => $s->dni,
             'birth_date'           => optional($s->birth_date)?->format('Y-m-d'),
@@ -175,25 +179,22 @@ class StudentController extends Controller
             'has_driver_license'   => $s->has_driver_license,
             'has_vehicle'          => $s->has_vehicle,
 
-            // ACADÉMICOS
-            'cycle'                => $s->cycle,
+            'cycle'                => $cycleValue,  // <- SIEMPRE devolvemos 'cycle' al front
             'center'               => $s->center,
             'year_start'           => $s->year_start,
             'year_end'             => $s->year_end,
-            'fp_modality'          => $s->fp_modality, // dual | general
+            'fp_modality'          => $s->fp_modality,
 
-            // DISPONIBILIDAD
-            'availability_slot'    => $s->availability_slot, // morning | afternoon | both
+            'availability_slot'    => $s->availability_slot,
             'commitments'          => $s->commitments ?? [],
             'relocate'             => $s->relocate,
             'relocate_cities'      => $s->relocate_cities ?? [],
             'transport_own'        => $s->transport_own,
-            'work_modality'        => $s->work_modality,     // presencial | remota | hibrida
+            'work_modality'        => $s->work_modality,
             'remote_days'          => $s->remote_days,
             'days_per_week'        => $s->days_per_week,
             'available_from'       => optional($s->available_from)?->format('Y-m-d'),
 
-            // INTERESES / COMPETENCIAS / IDIOMAS
             'sectors'              => $s->sectors ?? [],
             'preferred_company_type'=> $s->preferred_company_type,
             'non_formal_experience'=> $s->non_formal_experience,
@@ -202,7 +203,6 @@ class StudentController extends Controller
             'languages'            => $s->languages ?? [],
             'certifications'       => $s->certifications ?? [],
 
-            // EXTRA / LINKS
             'hobbies'              => $s->hobbies,
             'clubs'                => $s->clubs,
             'motivation'           => $s->motivation,
@@ -213,7 +213,6 @@ class StudentController extends Controller
             'link_github'          => $s->link_github,
             'link_video'           => $s->link_video,
 
-            // RELACIONES para CV (lectura; CRUD lo haremos luego)
             'educations'           => $s->educations()
                                         ->orderBy('start_date','desc')
                                         ->get(['id','title','center','start_date','end_date'])
@@ -239,9 +238,6 @@ class StudentController extends Controller
         ];
     }
 
-    /**
-     * Restringe edición a su propio perfil (ajusta a tu política/roles si quieres)
-     */
     private function ensureOwnerOrAbort(Student $student): void
     {
         if ($student->user_id !== Auth::id()) {
