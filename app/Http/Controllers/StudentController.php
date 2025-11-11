@@ -144,6 +144,7 @@ class StudentController extends Controller
         return [
             'id'                  => $s->id,
             // personales
+            'user_name'           => optional($s->user)->name,
             'dni'                 => $s->dni,
             'phone'               => $s->phone,
             'birth_date'          => optional($s->birth_date)?->format('Y-m-d'),

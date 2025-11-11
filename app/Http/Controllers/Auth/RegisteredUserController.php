@@ -3,8 +3,9 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
-use App\Models\Student;
 use App\Models\User;
+use App\Models\Student;
+use App\Models\Company;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,31 +21,57 @@ class RegisteredUserController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'first_name' => ['required','string','max:100'],
-            'last_name'  => ['required','string','max:150'],
-            'cycle'      => ['required','in:1 DAM,2 DAM,1 DAW,2 DAW'],
-            'email'      => ['required','string','lowercase','email','max:255','unique:'.User::class],
-            'password'   => ['required','confirmed', Rules\Password::defaults()],
-        ]);
+        $role = $request->input('role', 'student');
 
-        $user = User::create([
-            'name'       => $validated['first_name'].' '.$validated['last_name'],
-            'first_name' => $validated['first_name'],
-            'last_name'  => $validated['last_name'],
-            'email'      => $validated['email'],
-            'password'   => Hash::make($validated['password']),
-        ]);
+        if ($role === 'company') {
+            $validated = $request->validate([
+                'role'         => ['required', 'in:student,company'],
+                'company_name' => ['required','string','max:255'],
+                'email'        => ['required','string','lowercase','email','max:255','unique:'.User::class],
+                'password'     => ['required','confirmed', Rules\Password::defaults()],
+            ]);
 
-        // Perfil mínimo sin full_name
-        Student::firstOrCreate(
-            ['user_id' => $user->id],
-            ['cycle' => $validated['cycle']]
-        );
+            $user = User::create([
+                'name'     => $validated['company_name'],
+                'email'    => $validated['email'],
+                'role'     => 'company',
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            Company::create([
+                'user_id' => $user->id,
+                'name'    => $validated['company_name'],
+            ]);
+        } else {
+            $validated = $request->validate([
+                'role'       => ['required', 'in:student,company'],
+                'first_name' => ['required','string','max:100'],
+                'last_name'  => ['required','string','max:150'],
+                'cycle'      => ['required','string','max:20'],
+                'email'      => ['required','string','lowercase','email','max:255','unique:'.User::class],
+                'password'   => ['required','confirmed', Rules\Password::defaults()],
+            ]);
+
+            $user = User::create([
+                'name'     => trim($validated['first_name'].' '.$validated['last_name']),
+                'email'    => $validated['email'],
+                'role'     => 'student',
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            Student::firstOrCreate(
+                ['user_id' => $user->id],
+                ['cycle'   => $validated['cycle']]
+            );
+        }
 
         event(new Registered($user));
         Auth::login($user);
 
-        return redirect()->intended(route('dashboard'));
+        return redirect()->intended(
+            $user->role === 'company'
+                ? route('companies.edit.me')
+                : route('students.edit.me')
+        );
     }
 }

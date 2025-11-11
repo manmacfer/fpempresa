@@ -45,6 +45,11 @@ class User extends Authenticatable
     // RELACIONES
     public function student()
     {
-        return $this->hasOne(Student::class);
+        return $this->hasOne(\App\Models\Student::class);
+    }
+
+    public function company()
+    {
+        return $this->hasOne(\App\Models\Company::class);
     }
 }

@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* === Legibilidad en modo oscuro para inputs/selects/textarea === */
+:root .dark input,
+:root .dark select,
+:root .dark textarea {
+  color: #f3f4f6; /* gray-100 */
+}
+
+:root .dark input::placeholder,
+:root .dark textarea::placeholder {
+  color: #9ca3af;
+}

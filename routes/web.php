@@ -8,8 +8,9 @@ use App\Http\Controllers\MatchingController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentEducationController;
 use App\Http\Controllers\StudentExperienceController;
+use App\Http\Controllers\CompanyController;
 
-Route::get('/', fn () => redirect()->route('dashboard'));
+Route::get('/', fn() => redirect()->route('dashboard'));
 
 Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard
@@ -28,7 +29,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- PERFIL ALUMNO (sin ID) ---
     Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
-    Route::match(['post','patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
+    Route::match(['post', 'patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
 
     // Perfil público
     Route::get('/students/public/{student}', [StudentController::class, 'publicShow'])->name('students.public.show');
@@ -43,9 +44,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('/students/me/experiences/{experience}', [StudentExperienceController::class, 'update'])->name('students.experiences.update');
     Route::delete('/students/me/experiences/{experience}', [StudentExperienceController::class, 'destroy'])->name('students.experiences.destroy');
 
-    // ⚠️ NO definimos aquí students.edit / students.update del resource para evitar conflicto de nombres.
-    // Si quieres mantener un show por ID para admins, podrías añadir:
-    // Route::resource('students', StudentController::class)->only(['show']);
+    // Perfil propio de empresa
+    Route::get('/companies/me/edit', [CompanyController::class, 'editMe'])->name('companies.edit.me');
+    Route::match(['post', 'patch'], '/companies/me', [CompanyController::class, 'updateMe'])->name('companies.update.me');
+
+
+    // Perfil público de empresa
+    Route::get('/companies/public/{company}', [CompanyController::class, 'publicShow'])->name('companies.public.show');
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';
