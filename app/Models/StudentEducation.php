@@ -10,9 +10,11 @@ class StudentEducation extends Model
 {
     use HasFactory;
 
+    protected $table = 'student_educations';
+
     protected $fillable = [
         'student_id',
-        'title',     // p.ej. "CFGM SMR", "CFGS DAW"
+        'title',
         'center',
         'start_date',
         'end_date',

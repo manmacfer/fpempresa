@@ -10,14 +10,16 @@ class StudentExperience extends Model
 {
     use HasFactory;
 
+    protected $table = 'student_experiences';
+
     protected $fillable = [
         'student_id',
         'company',
         'position',
         'start_date',
         'end_date',
-        'functions',     // responsabilidades / logros
-        'is_non_formal', // true si es voluntariado/colaboración
+        'functions',
+        'is_non_formal',
     ];
 
     protected $casts = [
