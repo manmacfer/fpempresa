@@ -1,33 +1,31 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Link, usePage } from '@inertiajs/vue3'
+import { Link } from '@inertiajs/vue3'
 import ToggleThemeButton from '@/Components/ToggleThemeButton.vue'
 
-// Estado UI
 const showingNavigationDropdown = ref(false)
 
-// Inertia page (en script se usa usePage, NO $page)
-const page = usePage()
+const role = computed(() => $page.props.auth?.role || 'student')
+const studentId = computed(() => $page.props.auth?.studentId)
+const companyId = computed(() => $page.props.auth?.companyId)
 
-// Helper robusto para comprobar rutas (Ziggy)
-function hasRoute(name) {
-  try {
-    return typeof route === 'function' && route().has(name)
-  } catch {
-    return false
-  }
-}
-
-// Nombre
 const firstName = computed(() => {
-  const fn = page?.props?.auth?.user?.first_name
-  if (fn && fn.toString().trim().length) return fn.toString().trim()
-  const raw = (page?.props?.auth?.user?.name ?? 'Usuario').toString().trim()
-  return (raw.split(' ')[0] || raw)
+  const n = ($page.props.auth?.user?.name || 'Usuario').trim()
+  return n.split(' ')[0] || n
 })
 
-// ID del estudiante compartido por HandleInertiaRequests
-const studentId = computed(() => page?.props?.auth?.studentId ?? null)
+const myEditHref = computed(() =>
+  role.value === 'company'
+    ? route('companies.edit.me')
+    : route('students.edit.me')
+)
+
+const myPublicHref = computed(() => {
+  if (role.value === 'company') {
+    return companyId.value ? route('companies.public.show', companyId.value) : null
+  }
+  return studentId.value ? route('students.public.show', studentId.value) : null
+})
 </script>
 
 <template>
@@ -47,7 +45,7 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('dashboard') }"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current?.('dashboard') }"
             >
               Dashboard
             </Link>
@@ -57,30 +55,32 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('vacancies.index') }"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current?.('vacancies.index') }"
             >
               Vacantes
             </Link>
 
             <Link
-              v-if="hasRoute('matchings.index')"
+              v-if="route().has && route().has('matchings.index')"
               :href="route('matchings.index')"
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('matchings.index') }"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current?.('matchings.index') }"
             >
               Matchings
             </Link>
 
-            <!-- Mi perfil (edición propia) -->
+            <!-- Mi perfil (según rol) -->
             <Link
-              v-if="hasRoute('students.edit.me')"
-              :href="route('students.edit.me')"
+              :href="myEditHref"
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('students.edit.me') }"
+              :class="{
+                'bg-gray-100 dark:bg-gray-800':
+                  route().current?.('students.edit.me') || route().current?.('companies.edit.me')
+              }"
             >
               Mi perfil
             </Link>
@@ -90,10 +90,10 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
           <div class="hidden items-center gap-3 sm:flex">
             <ToggleThemeButton class="me-1" />
 
-            <!-- Nombre → perfil público si hay studentId -->
+            <!-- Nombre → perfil público si existe id -->
             <Link
-              v-if="studentId && hasRoute('students.public.show')"
-              :href="route('students.public.show', studentId)"
+              v-if="myPublicHref"
+              :href="myPublicHref"
               class="text-sm text-gray-600 hover:underline dark:text-gray-300"
             >
               {{ firstName }}
@@ -103,7 +103,7 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
             </span>
 
             <Link
-              v-if="hasRoute('profile.edit')"
+              v-if="route().has && route().has('profile.edit')"
               :href="route('profile.edit')"
               class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
             >
@@ -111,7 +111,7 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
             </Link>
 
             <Link
-              v-if="hasRoute('logout')"
+              v-if="route().has && route().has('logout')"
               :href="route('logout')"
               method="post"
               as="button"
@@ -175,7 +175,7 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
           </Link>
 
           <Link
-            v-if="hasRoute('matchings.index')"
+            v-if="route().has && route().has('matchings.index')"
             :href="route('matchings.index')"
             class="block ps-3 pe-4 py-2 text-base font-medium
                    text-gray-600 hover:bg-gray-50 hover:text-gray-800
@@ -185,8 +185,7 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
           </Link>
 
           <Link
-            v-if="hasRoute('students.edit.me')"
-            :href="route('students.edit.me')"
+            :href="myEditHref"
             class="block ps-3 pe-4 py-2 text-base font-medium
                    text-gray-600 hover:bg-gray-50 hover:text-gray-800
                    dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
@@ -198,30 +197,26 @@ const studentId = computed(() => page?.props?.auth?.studentId ?? null)
         <div class="border-t border-gray-200 pb-1 pt-4 dark:border-gray-800">
           <div class="px-4">
             <div class="text-base font-medium text-gray-800 dark:text-gray-100">
-              <Link
-                v-if="studentId && hasRoute('students.public.show')"
-                :href="route('students.public.show', studentId)"
-                class="hover:underline"
-              >
+              <Link v-if="myPublicHref" :href="myPublicHref" class="hover:underline">
                 {{ firstName }}
               </Link>
               <span v-else>{{ firstName }}</span>
             </div>
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {{ page?.props?.auth?.user?.email || '' }}
+              {{ $page.props.auth?.user?.email || '' }}
             </div>
           </div>
 
           <div class="mt-3 space-y-1 px-4">
             <Link
-              v-if="hasRoute('profile.edit')"
+              v-if="route().has && route().has('profile.edit')"
               :href="route('profile.edit')"
               class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
             >
               Cuenta
             </Link>
             <Link
-              v-if="hasRoute('logout')"
+              v-if="route().has && route().has('logout')"
               :href="route('logout')"
               method="post"
               as="button"
