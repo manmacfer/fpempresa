@@ -29,27 +29,18 @@ class HandleInertiaRequests extends Middleware
      */
     public function share(Request $request): array
     {
-        $user = $request->user();
-        if ($user) {
-            // Evita N+1 al compartir ids
-            $user->loadMissing([
-                'student:id,user_id',
-                'company:id,user_id',
-            ]);
-        }
-
         return array_merge(parent::share($request), [
-            'auth' => [
-                'user'      => $user,
-                'role'      => $user?->role,
-                'studentId' => $user?->student?->id,
-                'companyId' => $user?->company?->id,
-            ],
             'flash' => [
-                'success' => fn () => $request->session()->get('success'),
-                'error'   => fn () => $request->session()->get('error'),
+                'success' => fn() => $request->session()->get('success'),
+                'error' => fn() => $request->session()->get('error'),
             ],
             'csrf_token' => csrf_token(),
+            'auth' => [
+                'user' => $request->user(),
+                'role' => $request->user()?->role,
+                'studentId' => optional($request->user()?->student)->id,
+                'companyId' => optional($request->user()?->company)->id,
+            ],
         ]);
     }
 }
