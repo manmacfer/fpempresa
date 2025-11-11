@@ -1,23 +1,22 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Link } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import ToggleThemeButton from '@/Components/ToggleThemeButton.vue'
 
+const page = usePage()
 const showingNavigationDropdown = ref(false)
 
-const role = computed(() => $page.props.auth?.role || 'student')
-const studentId = computed(() => $page.props.auth?.studentId)
-const companyId = computed(() => $page.props.auth?.companyId)
+const role = computed(() => page.props.auth?.role ?? 'student')
+const studentId = computed(() => page.props.auth?.studentId)
+const companyId = computed(() => page.props.auth?.companyId)
 
 const firstName = computed(() => {
-  const n = ($page.props.auth?.user?.name || 'Usuario').trim()
+  const n = (page.props.auth?.user?.name ?? 'Usuario').trim()
   return n.split(' ')[0] || n
 })
 
 const myEditHref = computed(() =>
-  role.value === 'company'
-    ? route('companies.edit.me')
-    : route('students.edit.me')
+  role.value === 'company' ? route('companies.edit.me') : route('students.edit.me')
 )
 
 const myPublicHref = computed(() => {
@@ -45,7 +44,7 @@ const myPublicHref = computed(() => {
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current?.('dashboard') }"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('dashboard') }"
             >
               Dashboard
             </Link>
@@ -55,7 +54,7 @@ const myPublicHref = computed(() => {
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current?.('vacancies.index') }"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('vacancies.index') }"
             >
               Vacantes
             </Link>
@@ -66,7 +65,7 @@ const myPublicHref = computed(() => {
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current?.('matchings.index') }"
+              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('matchings.index') }"
             >
               Matchings
             </Link>
@@ -79,7 +78,7 @@ const myPublicHref = computed(() => {
                      dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
               :class="{
                 'bg-gray-100 dark:bg-gray-800':
-                  route().current?.('students.edit.me') || route().current?.('companies.edit.me')
+                  route().current('students.edit.me') || route().current('companies.edit.me')
               }"
             >
               Mi perfil
@@ -203,7 +202,7 @@ const myPublicHref = computed(() => {
               <span v-else>{{ firstName }}</span>
             </div>
             <div class="text-sm font-medium text-gray-500 dark:text-gray-400">
-              {{ $page.props.auth?.user?.email || '' }}
+              {{ page.props.auth?.user?.email || '' }}
             </div>
           </div>
 
