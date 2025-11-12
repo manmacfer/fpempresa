@@ -24,23 +24,17 @@ class RegisteredUserController extends Controller
         $role = $request->input('role', 'student');
 
         if ($role === 'company') {
-            $companyName = $request->input('company_name') ?? $request->input('name');
-
+            // Empresa: nombre obligatorio
             $validated = $request->validate([
-                'role'                  => ['required', 'in:student,company'],
-                'company_name'          => ['nullable', 'string', 'max:255'],
-                'name'                  => ['nullable', 'string', 'max:255'],
-                'email'                 => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-                'password'              => ['required', 'confirmed', Rules\Password::defaults()],
+                'role'                  => ['required','in:student,company'],
+                'company_name'          => ['required','string','max:255'],
+                'email'                 => ['required','string','lowercase','email','max:255','unique:'.User::class],
+                'password'              => ['required','confirmed', Rules\Password::defaults()],
                 'password_confirmation' => ['required'],
             ]);
 
-            if (empty($companyName)) {
-                return back()->withErrors(['company_name' => 'El nombre de la empresa es obligatorio.'])->withInput();
-            }
-
             $user = User::create([
-                'name'     => $companyName,
+                'name'     => $validated['company_name'],
                 'email'    => $validated['email'],
                 'role'     => 'company',
                 'password' => Hash::make($validated['password']),
@@ -48,39 +42,22 @@ class RegisteredUserController extends Controller
 
             Company::create([
                 'user_id'    => $user->id,
-                // compat con BDD antigua:
-                'name'       => $companyName,
-                // columnas actuales “bonitas”:
-                'trade_name' => $companyName,
+                'name'       => $validated['company_name'], // compat si la columna existe
+                'trade_name' => $validated['company_name'],
             ]);
         } else {
-            $first = $request->input('first_name');
-            $last  = $request->input('last_name');
-
-            if (!$first && $request->filled('name')) {
-                $parts = preg_split('/\s+/', trim($request->input('name')), 2);
-                $first = $parts[0] ?? null;
-                $last  = $parts[1] ?? null;
-            }
-
+            // Alumno: nombre + apellidos obligatorios
             $validated = $request->validate([
-                'role'                  => ['required', 'in:student,company'],
-                'first_name'            => ['nullable', 'string', 'max:100'],
-                'last_name'             => ['nullable', 'string', 'max:150'],
-                'name'                  => ['nullable', 'string', 'max:255'],
-                'cycle'                 => ['nullable', 'string', 'max:20'],
-                'email'                 => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-                'password'              => ['required', 'confirmed', Rules\Password::defaults()],
+                'role'                  => ['required','in:student,company'],
+                'first_name'            => ['required','string','max:100'],
+                'last_name'             => ['required','string','max:150'],
+                'cycle'                 => ['required','string','max:20'],
+                'email'                 => ['required','string','lowercase','email','max:255','unique:'.User::class],
+                'password'              => ['required','confirmed', Rules\Password::defaults()],
                 'password_confirmation' => ['required'],
             ]);
 
-            $displayName = trim(($first ?? '') . ' ' . ($last ?? ''));
-            if (!$displayName && $request->filled('name')) {
-                $displayName = $request->input('name');
-            }
-            if (!$displayName) {
-                return back()->withErrors(['first_name' => 'Nombre obligatorio.'])->withInput();
-            }
+            $displayName = trim($validated['first_name'].' '.$validated['last_name']);
 
             $user = User::create([
                 'name'     => $displayName,
@@ -89,10 +66,12 @@ class RegisteredUserController extends Controller
                 'password' => Hash::make($validated['password']),
             ]);
 
-            Student::firstOrCreate(
-                ['user_id' => $user->id],
-                ['cycle'   => $validated['cycle'] ?? null]
-            );
+            Student::create([
+                'user_id'    => $user->id,
+                'first_name' => $validated['first_name'],
+                'last_name'  => $validated['last_name'],
+                'cycle'      => $validated['cycle'],
+            ]);
         }
 
         event(new Registered($user));
