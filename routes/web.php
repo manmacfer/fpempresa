@@ -51,6 +51,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Perfil público de empresa
     Route::get('/companies/public/{company}', [CompanyController::class, 'publicShow'])->name('companies.public.show');
+
+
+    Route::middleware(['auth','role:company'])->group(function () {
+    Route::get('/companies/me/edit', [CompanyController::class, 'editMe'])->name('companies.edit.me');
+    Route::put('/companies/me',      [CompanyController::class, 'updateMe'])->name('companies.update.me');
+    // más rutas SOLO empresa...
+});
+
+Route::middleware(['auth','role:student'])->group(function () {
+    Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
+    Route::put('/students/me',      [StudentController::class, 'updateMe'])->name('students.update.me');
+    // más rutas SOLO alumno...
+});
+
 });
 
 require __DIR__ . '/auth.php';

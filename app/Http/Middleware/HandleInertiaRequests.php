@@ -18,8 +18,13 @@ class HandleInertiaRequests extends Middleware
     public function share(Request $request): array
     {
         $user = $request->user();
+
         if ($user) {
-            $user->loadMissing(['student:id,user_id','company:id,user_id']);
+            $user->loadMissing([
+                'student:id,user_id',
+                'company:id,user_id',
+                'role:id,slug,name',
+            ]);
         }
 
         return array_merge(parent::share($request), [
@@ -28,9 +33,12 @@ class HandleInertiaRequests extends Middleware
                 'error'   => fn () => $request->session()->get('error'),
             ],
             'csrf_token' => csrf_token(),
+
             'auth' => [
                 'user'      => $user,
-                'role'      => $user?->role,          // <-- aquí viene el rol
+                'roleId'    => $user?->role_id,        // numérico (1..4)
+                'roleSlug'  => $user?->role?->slug,    // 'student' | 'company' | ...
+                'roleName'  => $user?->role?->name,    // 'Alumno' | 'Empresa' | ...
                 'studentId' => $user?->student?->id,
                 'companyId' => $user?->company?->id,
             ],
