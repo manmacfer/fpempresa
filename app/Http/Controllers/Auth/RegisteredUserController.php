@@ -32,18 +32,23 @@ class RegisteredUserController extends Controller
                 'password_confirmation' => ['required'],
             ]);
 
+            // IDs con fallback por si el seeder no corrió
             $roleId = Role::where('slug','company')->value('id') ?? 4;
 
             $user = User::create([
                 'name'     => $validated['company_name'],
                 'email'    => $validated['email'],
-                'role_id'  => $roleId,
                 'password' => Hash::make($validated['password']),
+
+                // ⚠️ Guardamos ambas cosas mientras migramos
+                'role_id'  => $roleId,
+                'role'     => 'company',
             ]);
 
             Company::create([
                 'user_id'    => $user->id,
-                'name'       => $validated['company_name'], // compat
+                // compat si tu tabla aún conserva `name`
+                'name'       => $validated['company_name'],
                 'trade_name' => $validated['company_name'],
             ]);
         } else {
@@ -62,8 +67,11 @@ class RegisteredUserController extends Controller
             $user = User::create([
                 'name'     => trim($validated['first_name'].' '.$validated['last_name']),
                 'email'    => $validated['email'],
-                'role_id'  => $roleId,
                 'password' => Hash::make($validated['password']),
+
+                // ⚠️ Guardamos ambas cosas
+                'role_id'  => $roleId,
+                'role'     => 'student',
             ]);
 
             Student::create([
@@ -77,8 +85,9 @@ class RegisteredUserController extends Controller
         event(new Registered($user));
         Auth::login($user);
 
+        // Redirige a la zona del rol (si prefieres al dashboard, cambia por '/dashboard')
         return redirect()->to(
-            ($user->role?->slug ?? '') === 'company'
+            ($user->role ?? null) === 'company'
                 ? '/companies/me/edit'
                 : '/students/me/edit'
         );

@@ -36,9 +36,12 @@ class HandleInertiaRequests extends Middleware
 
             'auth' => [
                 'user'      => $user,
-                'roleId'    => $user?->role_id,        // numérico (1..4)
-                'roleSlug'  => $user?->role?->slug,    // 'student' | 'company' | ...
-                'roleName'  => $user?->role?->name,    // 'Alumno' | 'Empresa' | ...
+                // numérico + slug + nombre
+                'roleId'    => $user?->role_id,
+                'roleSlug'  => $user?->role?->slug,
+                'roleName'  => $user?->role?->name,
+                // legacy mientras migras
+                'role'      => $user?->role,
                 'studentId' => $user?->student?->id,
                 'companyId' => $user?->company?->id,
             ],

@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 class RoleMiddleware
 {
     /**
-     * Uso en rutas:
+     * Uso:
      *   ->middleware(['auth','role:company'])
      *   ->middleware(['auth','role:student'])
      *   ->middleware(['auth','role:4']) // si usas ids numéricos
@@ -20,10 +20,10 @@ class RoleMiddleware
             abort(403);
         }
 
-        // Compatibilidad con ambos enfoques:
-        $slug = $user->role->slug ?? null;            // si tienes tabla roles (role_id + relación)
-        $id   = isset($user->role_id) ? (string)$user->role_id : null;  // id numérico
-        $legacy = $user->role ?? null;                // legacy: columna users.role (string)
+        // Compat total: slug (roles table), id numérico, string legacy
+        $slug   = $user->role->slug ?? null;                 // p.ej. 'company'
+        $id     = isset($user->role_id) ? (string)$user->role_id : null; // p.ej. '4'
+        $legacy = $user->role ?? null;                       // p.ej. 'company'
 
         foreach ($roles as $r) {
             if ($r === $slug || $r === $id || $r === $legacy) {
