@@ -24,7 +24,6 @@ class RegisteredUserController extends Controller
         $role = $request->input('role', 'student');
 
         if ($role === 'company') {
-            // Empresa: nombre obligatorio
             $validated = $request->validate([
                 'role'                  => ['required','in:student,company'],
                 'company_name'          => ['required','string','max:255'],
@@ -36,17 +35,17 @@ class RegisteredUserController extends Controller
             $user = User::create([
                 'name'     => $validated['company_name'],
                 'email'    => $validated['email'],
-                'role'     => 'company',
+                'role'     => 'company', // <-- AQUÍ se guarda el rol
                 'password' => Hash::make($validated['password']),
             ]);
 
             Company::create([
                 'user_id'    => $user->id,
-                'name'       => $validated['company_name'], // compat si la columna existe
+                // Compat por si tu tabla aún conserva `name`:
+                'name'       => $validated['company_name'],
                 'trade_name' => $validated['company_name'],
             ]);
         } else {
-            // Alumno: nombre + apellidos obligatorios
             $validated = $request->validate([
                 'role'                  => ['required','in:student,company'],
                 'first_name'            => ['required','string','max:100'],
@@ -57,12 +56,10 @@ class RegisteredUserController extends Controller
                 'password_confirmation' => ['required'],
             ]);
 
-            $displayName = trim($validated['first_name'].' '.$validated['last_name']);
-
             $user = User::create([
-                'name'     => $displayName,
+                'name'     => trim($validated['first_name'].' '.$validated['last_name']),
                 'email'    => $validated['email'],
-                'role'     => 'student',
+                'role'     => 'student', // <-- AQUÍ se guarda el rol
                 'password' => Hash::make($validated['password']),
             ]);
 

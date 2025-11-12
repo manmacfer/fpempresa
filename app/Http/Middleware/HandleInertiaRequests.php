@@ -19,7 +19,7 @@ class HandleInertiaRequests extends Middleware
     {
         $user = $request->user();
         if ($user) {
-            $user->loadMissing(['student:id,user_id', 'company:id,user_id']);
+            $user->loadMissing(['student:id,user_id','company:id,user_id']);
         }
 
         return array_merge(parent::share($request), [
@@ -30,7 +30,7 @@ class HandleInertiaRequests extends Middleware
             'csrf_token' => csrf_token(),
             'auth' => [
                 'user'      => $user,
-                'role'      => $user?->role,               // <- aquí llega el rol
+                'role'      => $user?->role,          // <-- aquí viene el rol
                 'studentId' => $user?->student?->id,
                 'companyId' => $user?->company?->id,
             ],
