@@ -40,7 +40,7 @@ const props = defineProps({
           </dl>
 
           <div class="mt-4 flex items-center justify-between">
-            <Link :href="`/vacantes/${v.id}`" class="text-indigo-600 hover:underline dark:text-indigo-400">Ver</Link>
+            <Link :href="route('vacancies.show', v.id)" class="text-indigo-600 hover:underline dark:text-indigo-400">Ver</Link>
             <!-- aquí luego pondremos Editar/Cerrar -->
           </div>
         </div>
