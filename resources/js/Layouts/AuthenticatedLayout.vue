@@ -11,23 +11,19 @@ const studentId = computed(() => page.props.auth?.studentId)
 const companyId = computed(() => page.props.auth?.companyId)
 
 // ---- Normalización de rol ----
-// Acepta roleSlug (si usas tabla roles) o role (legacy string)
-// y normaliza alias: alumno/alumnos/students -> student; empresa/companies -> company
 const rawRole = computed(() => page.props.auth?.roleSlug ?? page.props.auth?.role ?? null)
 const normalize = (v) => {
   if (!v) return null
   const s = String(v).toLowerCase().trim()
   if (['student','students','alumno','alumna','alumnos','alumnas','estudiante','estudiantes'].includes(s)) return 'student'
   if (['company','companies','empresa','empresas','compania','compañia','compañía'].includes(s)) return 'company'
-  return s // por si usas admin/teacher u otros
+  return s
 }
 const role = computed(() => {
   const n = normalize(rawRole.value)
   if (n) return n
-  // Deducción de emergencia por IDs (si el campo role viniera vacío)
   if (companyId.value && !studentId.value) return 'company'
   if (studentId.value && !companyId.value) return 'student'
-  // por defecto mantenemos student (como tenías)
   return 'student'
 })
 
@@ -37,7 +33,7 @@ const firstName = computed(() => {
   return n.split(' ')[0] || n
 })
 
-// Rutas (mantengo tu uso de Ziggy `route()`)
+// Rutas
 const myEditHref = computed(() =>
   role.value === 'company' ? route('companies.edit.me') : route('students.edit.me')
 )
@@ -62,17 +58,9 @@ const myPublicHref = computed(() => {
               FP Empresa
             </Link>
 
+            <!-- Vacantes SOLO para alumnos -->
             <Link
-              :href="route('dashboard')"
-              class="text-sm rounded-lg px-3 py-2 font-medium
-                     text-gray-600 hover:bg-gray-50 hover:text-gray-900
-                     dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-              :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('dashboard') }"
-            >
-              Dashboard
-            </Link>
-
-            <Link
+              v-if="role==='student'"
               :href="route('vacancies.index')"
               class="text-sm rounded-lg px-3 py-2 font-medium
                      text-gray-600 hover:bg-gray-50 hover:text-gray-900
@@ -201,16 +189,9 @@ const myPublicHref = computed(() => {
         </div>
 
         <div class="space-y-1 pb-3 pt-2">
+          <!-- Vacantes SOLO alumnos en móvil -->
           <Link
-            :href="route('dashboard')"
-            class="block ps-3 pe-4 py-2 text-base font-medium
-                   text-gray-600 hover:bg-gray-50 hover:text-gray-800
-                   dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
-          >
-            Dashboard
-          </Link>
-
-          <Link
+            v-if="role==='student'"
             :href="route('vacancies.index')"
             class="block ps-3 pe-4 py-2 text-base font-medium
                    text-gray-600 hover:bg-gray-50 hover:text-gray-800
