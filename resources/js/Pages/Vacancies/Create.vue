@@ -4,12 +4,15 @@ import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed, ref } from 'vue'
 
 const props = defineProps({
-  defaults: { type: Object, default: () => ({}) },
+  defaults:   { type: Object, default: () => ({}) },
+  // <-- Añadido: lista de idiomas que te envía el controller (id + name/nombre)
+  languages:  { type: Array,  default: () => [] },
 })
 
-const page = usePage()
+const page  = usePage()
 const flash = computed(() => page.props.flash || {})
 
+/* === Opciones existentes (NO TOCAR) === */
 const TECH_OPTIONS = [
   // Backend / Lenguajes
   'PHP','Laravel','Symfony','Java','Spring Boot','.NET','C#','Node.js','Express','Python','Django','Flask','Ruby on Rails','Go','Rust',
@@ -32,20 +35,25 @@ const SOFT_OPTIONS = [
   'Atención al detalle','Gestión del tiempo','Pensamiento crítico'
 ]
 
+/* === Form === */
 const form = useForm({
   title: '',
   description: '',
   cycle_required: '',
-  mode: props.defaults.mode ?? 'onsite',
+  mode: props.defaults.mode ?? 'onsite', // onsite | remote | hybrid
   city: '',
   province: '',
   hours_per_week: null,
   duration_weeks: null,
   paid: props.defaults.paid ?? false,
   salary_month: null,
-  tech_stack: [],       // ← checkboxes
-  soft_skills: [],      // ← checkboxes (dejamos también como array)
+
+  tech_stack: [],      // ← checkboxes
+  soft_skills: [],     // ← checkboxes
   status: props.defaults.status ?? 'draft',
+
+  // ← Añadido: requisitos de idioma [{ language_id, min_level }]
+  languages_required: [],
 })
 
 function submit(publish = false) {
@@ -53,12 +61,20 @@ function submit(publish = false) {
   form.post(route('vacancies.store'), { preserveScroll: true })
 }
 
-// Helpers para checkboxes
+/* === Helpers existentes para checkboxes === */
 const toggle = (arr, val) => {
   const i = arr.indexOf(val)
   if (i === -1) arr.push(val); else arr.splice(i,1)
 }
 const isChecked = (arr, val) => arr.includes(val)
+
+/* === Añadido: idiomas requeridos === */
+const levelOptions = ['A1','A2','B1','B2','C1','C2']
+const addLang     = () => form.languages_required.push({ language_id: null, min_level: 'B1' })
+const removeLang  = (idx) => form.languages_required.splice(idx, 1)
+
+// por si tu tabla usa 'name' o 'nombre'
+const langLabel = (l) => l?.name ?? l?.nombre ?? '—'
 </script>
 
 <template>
@@ -178,6 +194,41 @@ const isChecked = (arr, val) => arr.includes(val)
                 />
                 <span>{{ s }}</span>
               </label>
+            </div>
+          </div>
+
+          <!-- Idiomas requeridos (NUEVO) -->
+          <div>
+            <div class="mb-2 flex items-center justify-between">
+              <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Idiomas requeridos</label>
+              <button type="button"
+                      @click="addLang"
+                      class="rounded-xl bg-gray-900 px-3 py-1 text-sm text-white hover:bg-black dark:bg-gray-700 dark:hover:bg-gray-600">
+                Añadir idioma
+              </button>
+            </div>
+
+            <p v-if="!form.languages_required.length" class="text-sm text-gray-500 dark:text-gray-400">
+              Si lo dejas vacío, <b>no</b> se requerirá ningún idioma.
+            </p>
+
+            <div v-for="(row, idx) in form.languages_required" :key="idx" class="mb-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+              <select v-model.number="row.language_id"
+                      class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
+                <option :value="null" disabled>Idioma…</option>
+                <option v-for="l in props.languages" :key="l.id" :value="l.id">{{ langLabel(l) }}</option>
+              </select>
+
+              <select v-model="row.min_level"
+                      class="rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100">
+                <option v-for="lv in levelOptions" :key="lv" :value="lv">{{ lv }}</option>
+              </select>
+
+              <button type="button"
+                      @click="removeLang(idx)"
+                      class="rounded-lg border px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800/70">
+                Quitar
+              </button>
             </div>
           </div>
         </section>

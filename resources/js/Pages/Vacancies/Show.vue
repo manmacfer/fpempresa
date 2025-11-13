@@ -1,16 +1,19 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { Head, Link, usePage } from '@inertiajs/vue3'
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
 const props = defineProps({
-  vacancy: { type: Object, required: true },
+  vacancy:  { type: Object, required: true },
+  // Permite que el backend controle cuándo mostrar el botón de Match al alumno,
+  // pero si no viene, seguiremos deduciendo por rol (student).
+  canMatch: { type: Boolean, default: false },
 })
 
 const page = usePage()
 const auth = computed(() => page.props.auth || {})
 
-// Normalización mínima de rol (company/student)
+/** --------- Normalización mínima de rol (company/student) --------- */
 const rawRole = computed(() => auth.value.roleSlug ?? auth.value.role ?? null)
 const normalize = (v) => {
   if (!v) return null
@@ -22,15 +25,20 @@ const normalize = (v) => {
 const role = computed(() => normalize(rawRole.value) ?? 'student')
 
 const isCompany = computed(() => role.value === 'company')
-const isOwner   = computed(() => isCompany.value && auth.value.companyId && auth.value.companyId === props.vacancy.company_id)
+const isOwner   = computed(() =>
+  isCompany.value &&
+  auth.value.companyId &&
+  auth.value.companyId === props.vacancy.company_id
+)
 
+/** --------- Datos cabecera --------- */
 const companyName = computed(() =>
   props.vacancy.company?.trade_name ||
   props.vacancy.company?.legal_name ||
   'Empresa'
 )
 
-// Si existe la ruta matchings.index, generamos URL con ?vacancy_id=...
+/** --------- URL a “Ver Match” (vista de empresa) --------- */
 const matchUrl = computed(() => {
   try {
     if (route().has && route().has('matchings.index')) {
@@ -40,6 +48,14 @@ const matchUrl = computed(() => {
   return null
 })
 
+/** --------- Botón Match (alumno) --------- */
+const matchForm = useForm({})
+const doMatch = () => {
+  // Usa tu ruta existente de aplicar
+  matchForm.post(route('applications.store', props.vacancy.id))
+}
+
+/** --------- Badges --------- */
 const badge = (text, tone = 'gray') => {
   const tones = {
     gray:   'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300',
@@ -94,7 +110,7 @@ const badge = (text, tone = 'gray') => {
 
         <!-- Acciones -->
         <div class="flex items-center gap-2">
-          <!-- Botón Match solo para empresas -->
+          <!-- Empresa: Ver Match (mantengo tu botón original) -->
           <Link
             v-if="isCompany && matchUrl"
             :href="matchUrl"
@@ -103,7 +119,7 @@ const badge = (text, tone = 'gray') => {
             Ver Match
           </Link>
 
-          <!-- Volver -->
+          <!-- Empresa: Mis vacantes -->
           <Link
             :href="route('vacancies.my')"
             class="inline-flex items-center rounded-xl bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-black dark:bg-gray-700 dark:hover:bg-gray-600"
@@ -111,6 +127,8 @@ const badge = (text, tone = 'gray') => {
           >
             Mis vacantes
           </Link>
+
+          <!-- Alumno: volver al listado -->
           <Link
             :href="route('vacancies.index')"
             class="inline-flex items-center rounded-xl border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800/70"
@@ -118,6 +136,16 @@ const badge = (text, tone = 'gray') => {
           >
             Volver al listado
           </Link>
+
+          <!-- Alumno: botón Match (añadido sin romper lo previo) -->
+          <button
+            v-if="props.canMatch || role === 'student'"
+            @click="doMatch"
+            :disabled="matchForm.processing"
+            class="inline-flex items-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+          >
+            Quiero esta práctica (Match)
+          </button>
         </div>
       </div>
 
@@ -148,19 +176,44 @@ const badge = (text, tone = 'gray') => {
             </div>
           </dl>
 
+          <!-- Idiomas requeridos (nuevo, sin quitar nada) -->
+          <div v-if="props.vacancy.required_languages?.length" class="mt-5">
+            <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Idiomas requeridos</h4>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <span
+                v-for="l in props.vacancy.required_languages"
+                :key="l.id"
+                class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+              >
+                {{ l.name }}
+                <span v-if="l.pivot?.min_level">({{ l.pivot.min_level }})</span>
+              </span>
+            </div>
+          </div>
+
+          <!-- Tecnologías (mantenido) -->
           <div v-if="props.vacancy.tech_stack?.length" class="mt-5">
             <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Tecnologías</h4>
             <div class="mt-2 flex flex-wrap gap-2">
-              <span v-for="t in props.vacancy.tech_stack" :key="t" class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+              <span
+                v-for="t in props.vacancy.tech_stack"
+                :key="t"
+                class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+              >
                 {{ t }}
               </span>
             </div>
           </div>
 
+          <!-- Soft skills (mantenido) -->
           <div v-if="props.vacancy.soft_skills?.length" class="mt-5">
             <h4 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Soft skills</h4>
             <div class="mt-2 flex flex-wrap gap-2">
-              <span v-for="s in props.vacancy.soft_skills" :key="s" class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300">
+              <span
+                v-for="s in props.vacancy.soft_skills"
+                :key="s"
+                class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 dark:bg-gray-900 dark:text-gray-300"
+              >
                 {{ s }}
               </span>
             </div>

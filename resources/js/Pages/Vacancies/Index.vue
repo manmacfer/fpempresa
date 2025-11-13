@@ -5,17 +5,28 @@ import { computed } from 'vue'
 
 const props = defineProps({
   vacantes: Object, // paginator de Laravel (data, links, meta…)
-  filters: Object,  // { ciclo, modalidad, ubicacion }
+  filters:  Object, // { ciclo, modalidad, ubicacion }
 })
 
-const page = usePage()
+const page  = usePage()
 const flash = computed(() => page.props.flash || {})
 
-// Rol actual (STUDENT / COMPANY / PROFESSOR / ADMIN)
-const role = computed(() => page.props.auth?.user?.role ?? null)
-const isStudent = computed(() => role.value === 'STUDENT')
-const canCreate = computed(() => ['COMPANY', 'PROFESSOR', 'ADMIN'].includes(role.value))
+/* ---- Rol actual (tolerante a distintos esquemas) ---- */
+const rawRole = computed(() =>
+  page.props.auth?.roleSlug ??
+  page.props.auth?.role ??
+  page.props.auth?.user?.role ??
+  null
+)
+const norm = (v) => !v ? null : String(v).trim().toUpperCase()
+const role = computed(() => norm(rawRole.value))
+const isStudent = computed(() => role.value === 'STUDENT' || role.value === 'STUDENTs' || role.value === 'ALUMNO' || role.value === 'ALUMNOS' || role.value === 'STUDENT'.toUpperCase())
+const canCreate = computed(() => {
+  const r = role.value
+  return r === 'COMPANY' || r === 'PROFESSOR' || r === 'ADMIN' || r === 'EMPRESA'
+})
 
+/* ---- Filtros ---- */
 function filtrar(e) {
   e.preventDefault()
   const form = new FormData(e.target)
@@ -25,7 +36,6 @@ function filtrar(e) {
     replace: true,
   })
 }
-
 function limpiar() {
   router.get('/vacantes', {}, {
     preserveState: false,
@@ -34,8 +44,37 @@ function limpiar() {
   })
 }
 
+/* ---- Aplicar (solo alumnos) ---- */
 function aplicar(id) {
   router.post(`/vacantes/${id}/aplicar`, {}, { preserveScroll: true })
+}
+
+/* ---- Helpers visuales ---- */
+const formatMode = (m) => {
+  const v = (m || '').toString().toLowerCase()
+  if (v === 'remote' || v === 'remoto') return 'Remoto'
+  if (v === 'hybrid' || v === 'híbrido' || v === 'hibrido') return 'Híbrido'
+  return 'Presencial'
+}
+const ubicacionDe = (v) => {
+  // Soporta `ubicacion` (cadena) o city/province
+  if (v.ubicacion) return v.ubicacion
+  const city = v.city || ''
+  const prov = v.province || ''
+  if (city && prov) return `${city} — ${prov}`
+  return city || prov || '—'
+}
+const cicloDe = (v) => v.ciclo_requerido || v.cycle_required || '—'
+const modalidadDe = (v) => v.modalidad || v.mode || null
+const createdDe = (v) => (v.created_at || '').slice(0, 10)
+
+// score: admitimos varios nombres
+const scoreOf = (v) => {
+  const s = v.score ?? v.compatibility ?? v.match_score
+  if (s === undefined || s === null) return null
+  const n = Number(s)
+  if (Number.isNaN(n)) return null
+  return Math.round(n)
 }
 </script>
 
@@ -94,7 +133,7 @@ function aplicar(id) {
                 class="mt-1 w-full rounded-md border-gray-300 bg-white text-gray-900 placeholder-gray-400
                        focus:border-indigo-500 focus:ring-indigo-500
                        dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400 dark:focus:border-indigo-400 dark:focus:ring-indigo-400"
-                :value="filters.ciclo || ''"
+                :value="filters?.ciclo || ''"
                 placeholder="DAW, DAM…"
               />
             </div>
@@ -106,7 +145,7 @@ function aplicar(id) {
                 class="mt-1 w-full rounded-md border-gray-300 bg-white text-gray-900
                        focus:border-indigo-500 focus:ring-indigo-500
                        dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:focus:border-indigo-400 dark:focus:ring-indigo-400"
-                :value="filters.modalidad || ''"
+                :value="filters?.modalidad || ''"
               >
                 <option value="">Cualquiera</option>
                 <option value="presencial">Presencial</option>
@@ -122,7 +161,7 @@ function aplicar(id) {
                 class="mt-1 w-full rounded-md border-gray-300 bg-white text-gray-900 placeholder-gray-400
                        focus:border-indigo-500 focus:ring-indigo-500
                        dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-400 dark:focus:border-indigo-400 dark:focus:ring-indigo-400"
-                :value="filters.ubicacion || ''"
+                :value="filters?.ubicacion || ''"
                 placeholder="Madrid, remoto…"
               />
             </div>
@@ -163,10 +202,20 @@ function aplicar(id) {
                 {{ v.title }}
               </h3>
 
-              <!-- Etiquetas -->
+              <!-- Etiquetas (modalidad + compatibilidad si viene del backend) -->
               <div class="flex shrink-0 items-center gap-1">
-                <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300">
-                  {{ v.modalidad || '—' }}
+                <span
+                  v-if="modalidadDe(v)"
+                  class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300"
+                >
+                  {{ formatMode(modalidadDe(v)) }}
+                </span>
+                <span
+                  v-if="scoreOf(v) !== null"
+                  class="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white"
+                  :title="'Compatibilidad'"
+                >
+                  {{ scoreOf(v) }}%
                 </span>
               </div>
             </div>
@@ -175,18 +224,18 @@ function aplicar(id) {
               <div class="flex items-center gap-2">
                 <span class="inline-flex h-2 w-2 rounded-full bg-gray-400"></span>
                 <span class="font-medium">Ciclo:</span>
-                <span>{{ v.ciclo_requerido || '—' }}</span>
+                <span>{{ cicloDe(v) }}</span>
               </div>
               <div class="mt-1 flex items-center gap-2">
                 <span class="inline-flex h-2 w-2 rounded-full bg-gray-400"></span>
                 <span class="font-medium">Ubicación:</span>
-                <span>{{ v.ubicacion || '—' }}</span>
+                <span>{{ ubicacionDe(v) }}</span>
               </div>
             </div>
 
             <div class="mt-4 flex items-center justify-between">
               <div class="text-xs text-gray-500 dark:text-gray-400">
-                Publicada: {{ (v.created_at || '').slice(0, 10) }}
+                Publicada: {{ createdDe(v) }}
               </div>
 
               <!-- Aplicar (solo alumnos) -->
@@ -200,6 +249,14 @@ function aplicar(id) {
               >
                 Aplicar
               </button>
+
+              <!-- Ver más -->
+              <Link
+                :href="route().has && route().has('vacancies.show') ? route('vacancies.show', v.id) : `/vacantes/${v.id}`"
+                class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
+              >
+                Ver más
+              </Link>
             </div>
           </div>
         </div>
