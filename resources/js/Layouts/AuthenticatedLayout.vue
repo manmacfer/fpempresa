@@ -6,15 +6,38 @@ import ToggleThemeButton from '@/Components/ToggleThemeButton.vue'
 const page = usePage()
 const showingNavigationDropdown = ref(false)
 
-const role = computed(() => page.props.auth?.role ?? 'student')
+// IDs que nos llegan desde Inertia
 const studentId = computed(() => page.props.auth?.studentId)
 const companyId = computed(() => page.props.auth?.companyId)
 
+// ---- Normalización de rol ----
+// Acepta roleSlug (si usas tabla roles) o role (legacy string)
+// y normaliza alias: alumno/alumnos/students -> student; empresa/companies -> company
+const rawRole = computed(() => page.props.auth?.roleSlug ?? page.props.auth?.role ?? null)
+const normalize = (v) => {
+  if (!v) return null
+  const s = String(v).toLowerCase().trim()
+  if (['student','students','alumno','alumna','alumnos','alumnas','estudiante','estudiantes'].includes(s)) return 'student'
+  if (['company','companies','empresa','empresas','compania','compañia','compañía'].includes(s)) return 'company'
+  return s // por si usas admin/teacher u otros
+}
+const role = computed(() => {
+  const n = normalize(rawRole.value)
+  if (n) return n
+  // Deducción de emergencia por IDs (si el campo role viniera vacío)
+  if (companyId.value && !studentId.value) return 'company'
+  if (studentId.value && !companyId.value) return 'student'
+  // por defecto mantenemos student (como tenías)
+  return 'student'
+})
+
+// Nombre corto mostrado
 const firstName = computed(() => {
-  const n = (page.props.auth?.user?.name ?? 'Usuario').trim()
+  const n = (page.props.auth?.user?.name ?? 'Usuario').toString().trim()
   return n.split(' ')[0] || n
 })
 
+// Rutas (mantengo tu uso de Ziggy `route()`)
 const myEditHref = computed(() =>
   role.value === 'company' ? route('companies.edit.me') : route('students.edit.me')
 )

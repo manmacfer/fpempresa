@@ -6,6 +6,7 @@ use App\Models\Company;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
+
 class CompanyController extends Controller
 {
     public function editMe(Request $request)
@@ -13,7 +14,14 @@ class CompanyController extends Controller
         $company = $request->user()->company()->firstOrFail();
 
         return Inertia::render('Companies/Edit', [
-            'company' => $company,
+            'company' => $company->only([
+                'id',
+                'legal_name','trade_name','cif','sector',
+                'website','linkedin',
+                'phone','city','province','postal_code',
+                'contact_name','contact_email',
+                'description',
+            ]),
         ]);
     }
 
@@ -26,8 +34,8 @@ class CompanyController extends Controller
             'trade_name'    => ['nullable','string','max:255'],
             'cif'           => ['nullable','string','max:20'],
             'sector'        => ['nullable','string','max:255'],
-            'website'       => ['nullable','url'],
-            'linkedin'      => ['nullable','url'],
+            'website'       => ['nullable','url','max:255'],
+            'linkedin'      => ['nullable','url','max:255'],
             'phone'         => ['nullable','string','max:30'],
             'city'          => ['nullable','string','max:255'],
             'province'      => ['nullable','string','max:255'],
@@ -46,8 +54,10 @@ class CompanyController extends Controller
     {
         return Inertia::render('Companies/PublicShow', [
             'company' => $company->only([
-                'id','trade_name','legal_name','sector','website','linkedin',
-                'city','province','description'
+                'id','trade_name','legal_name','sector',
+                'website','linkedin',
+                'city','province',
+                'description',
             ]),
         ]);
     }

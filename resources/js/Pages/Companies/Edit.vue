@@ -4,12 +4,7 @@ import { Link, useForm, usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
 const props = defineProps({
-  company: {
-    type: Object,
-    required: true,
-    // Esperado desde el controlador: id, legal_name, trade_name, cif, sector, website, linkedin,
-    // phone, city, province, postal_code, contact_name, contact_email, description
-  },
+  company: { type: Object, required: true },
 })
 
 const page = usePage()
@@ -32,13 +27,10 @@ const form = useForm({
 })
 
 function submit() {
-  // Evitamos depender de Ziggy: URL directa
-  form.put('/companies/me', {
-    preserveScroll: true,
-  })
+  form.patch('/companies/me', { preserveScroll: true })
 }
 
-const publicUrl = computed(() => `/companies/${props.company.id}`)
+const publicUrl = computed(() => `/companies/public/${props.company.id}`)
 </script>
 
 <template>
@@ -76,7 +68,7 @@ const publicUrl = computed(() => `/companies/${props.company.id}`)
       </div>
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Columna 1: Identidad -->
+        <!-- Identidad -->
         <section class="lg:col-span-2 rounded-2xl bg-white dark:bg-gray-800 shadow p-6 space-y-5">
           <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Identidad</h2>
 
@@ -125,7 +117,7 @@ const publicUrl = computed(() => `/companies/${props.company.id}`)
           </div>
         </section>
 
-        <!-- Columna 2: Contacto -->
+        <!-- Contacto -->
         <aside class="rounded-2xl bg-white dark:bg-gray-800 shadow p-6 space-y-5">
           <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Contacto</h2>
 
