@@ -7,6 +7,7 @@ use App\Models\Language;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Services\CompatibilityService;
 
 class VacancyController extends Controller
 {
@@ -19,57 +20,51 @@ class VacancyController extends Controller
     }
 
     // LISTADO PÚBLICO PARA ALUMNOS — ordenado por compatibilidad y filtrado >= 50
-    public function index(Request $request)
-    {
-        $user = $request->user();
-        if (!$user || ($user->role !== 'student' && !$user->student)) {
-            abort(403, 'Solo alumnos');
-        }
-        $studentId = $user->student?->id;
-        if (!$studentId) {
-            return Inertia::render('Vacancies/Index', ['items' => []]);
-        }
+    public function index(\Illuminate\Http\Request $request, CompatibilityService $svc)
+{
+    $user = $request->user();
 
-        // Cargamos todas publicadas para calcular score en PHP
-        $vacancies = Vacancy::query()
-            ->with(['company:id,trade_name,legal_name,city,province'])
-            ->where('status', 'published')
-            ->get();
-
-        // Datos alumno (competencias e idiomas)
-        $studentCompetencies = collect(DB::table('alumno_competencia')->where('student_id', $studentId)->pluck('competency_id'))->unique()->values();
-        $studentLangs = DB::table('alumno_idioma')->where('student_id', $studentId)->get()
-            ->mapWithKeys(function ($row) {
-                return [$row->language_id => strtoupper($row->level ?? '')];
-            });
-
-        $student = DB::table('students')->where('id', $studentId)->first();
-
-        $scored = $vacancies->map(function (Vacancy $v) use ($student, $studentCompetencies, $studentLangs) {
-            $score = $this->computeScore($student, $studentCompetencies, $studentLangs, $v);
-            return [
-                'id' => $v->id,
-                'title' => $v->title,
-                'city' => $v->city,
-                'province' => $v->province,
-                'mode' => $v->mode,
-                'cycle_required' => $v->cycle_required,
-                'paid' => $v->paid,
-                'salary_month' => $v->salary_month,
-                'company' => [
-                    'trade_name' => $v->company?->trade_name,
-                    'legal_name' => $v->company?->legal_name,
-                ],
-                'score' => (int) round($score),
-            ];
-        })->filter(fn($i) => $i['score'] >= 50)
-          ->sortByDesc('score')
-          ->values();
-
-        return Inertia::render('Vacancies/Index', [
-            'items' => $scored,
-        ]);
+    // Si es empresa, redirige a "mis vacantes" (tu menú ya oculta "Vacantes" a company)
+    if ($user->role === 'company' || ($user->company()->exists() && !$user->student()->exists())) {
+        return redirect()->route('vacancies.my');
     }
+
+    // Alumno: calculamos compatibilidad sobre publicadas
+    $student = $user->student; // relación que ya usas en el proyecto
+    $vacancies = Vacancy::query()
+        ->where('status', 'published')
+        ->with(['company', 'requiredLanguages']) // para show y cálculo
+        ->latest('published_at')
+        ->get();
+
+    $items = [];
+    foreach ($vacancies as $v) {
+        $calc = $svc->score($student, $v);
+        $pct  = (int) round($calc['score'] * 100);
+        if ($pct >= 50) {
+            $items[] = [
+                'id'       => $v->id,
+                'title'    => $v->title,
+                'company'  => [
+                    'trade_name' => $v->company->trade_name ?? null,
+                    'legal_name' => $v->company->legal_name ?? null,
+                ],
+                'city'     => $v->city,
+                'province' => $v->province,
+                'mode'     => $v->mode,
+                'score'    => $pct,
+            ];
+        }
+    }
+
+    // ordenar por score desc y luego fecha
+    usort($items, fn($a,$b) => $b['score'] <=> $a['score']);
+
+    // render especial para alumno (no tocamos tu "index" previo de filtros para no romperlo)
+    return Inertia::render('Vacancies/CompatIndex', [
+        'items' => $items,
+    ]);
+}
 
     // FORM crear — solo empresa
     public function create(Request $request)
@@ -234,4 +229,6 @@ class VacancyController extends Controller
 
         return min(100, $score);
     }
+
+    
 }

@@ -9,10 +9,21 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Vacancy extends Model
 {
     protected $fillable = [
-        'title','description','cycle_required','mode',
-        'city','province','hours_per_week','duration_weeks',
-        'paid','salary_month','status','tech_stack','soft_skills',
-        'company_id','published_at',
+        'title',
+        'description',
+        'cycle_required',
+        'mode',
+        'city',
+        'province',
+        'hours_per_week',
+        'duration_weeks',
+        'paid',
+        'salary_month',
+        'status',
+        'tech_stack',
+        'soft_skills',
+        'company_id',
+        'published_at',
     ];
 
     protected $casts = [
@@ -29,12 +40,12 @@ class Vacancy extends Model
     }
 
     // Idiomas requeridos (pivot con meta)
-    public function requiredLanguages(): BelongsToMany
-    {
-        return $this->belongsToMany(Language::class, 'vacante_idioma_req', 'vacancy_id', 'language_id')
-            ->withPivot(['min_level','required'])
-            ->withTimestamps();
-    }
+    public function requiredLanguages()
+{
+    return $this->belongsToMany(\App\Models\Language::class, 'vacante_idioma_req', 'vacancy_id', 'language_id')
+        ->withPivot('min_level'); 
+}
+
 
     // Competencias técnicas requeridas (si ya existe pivot vacante_competencia_req)
     public function requiredCompetencies()

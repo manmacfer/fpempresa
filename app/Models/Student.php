@@ -16,7 +16,7 @@ class Student extends Model
     protected $casts = [
         'birth_date'        => 'date',
         'available_from'    => 'date',
-        'has_driver_license'=> 'boolean',
+        'has_driver_license' => 'boolean',
         'has_vehicle'       => 'boolean',
         'relocate'          => 'boolean',
         'transport_own'     => 'boolean',
@@ -38,12 +38,34 @@ class Student extends Model
     protected $appends = ['avatar_url'];
 
     // Relaciones
-    public function educations(){ return $this->hasMany(StudentEducation::class); }
-    public function experiences(){ return $this->hasMany(StudentExperience::class); }
-    public function user(){ return $this->belongsTo(User::class); }
+    public function educations()
+    {
+        return $this->hasMany(StudentEducation::class);
+    }
+    public function experiences()
+    {
+        return $this->hasMany(StudentExperience::class);
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     // Accessors
-    public function getAvatarUrlAttribute(){
+    public function getAvatarUrlAttribute()
+    {
         return $this->avatar_path ? Storage::url($this->avatar_path) : null;
     }
+
+
+    public function languages()
+{
+    return $this->belongsToMany(\App\Models\Language::class, 'alumno_idioma', 'student_id', 'language_id')
+        ->withPivot(['level','nivel']);
+}
+
+public function competencies()
+{
+    return $this->belongsToMany(\App\Models\Competency::class, 'alumno_competencia', 'student_id', 'competency_id');
+}
 }
