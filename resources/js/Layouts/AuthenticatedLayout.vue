@@ -106,6 +106,29 @@ const myPublicHref = computed(() => {
             >
               Mi perfil
             </Link>
+
+            <!-- SOLO COMPANY: Crear/Mis vacantes -->
+            <template v-if="role==='company'">
+              <Link
+                :href="route('vacancies.create')"
+                class="text-sm rounded-lg px-3 py-2 font-medium
+                       text-gray-600 hover:bg-gray-50 hover:text-gray-900
+                       dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
+                :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('vacancies.create') }"
+              >
+                Crear vacante
+              </Link>
+
+              <Link
+                :href="route('vacancies.my')"
+                class="text-sm rounded-lg px-3 py-2 font-medium
+                       text-gray-600 hover:bg-gray-50 hover:text-gray-900
+                       dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
+                :class="{ 'bg-gray-100 dark:bg-gray-800': route().current('vacancies.my') }"
+              >
+                Mis vacantes
+              </Link>
+            </template>
           </div>
 
           <!-- DERECHA: tema + usuario -->
@@ -214,6 +237,27 @@ const myPublicHref = computed(() => {
           >
             Mi perfil
           </Link>
+
+          <!-- SOLO COMPANY en móvil -->
+          <template v-if="role==='company'">
+            <Link
+              :href="route('vacancies.create')"
+              class="block ps-3 pe-4 py-2 text-base font-medium
+                     text-gray-600 hover:bg-gray-50 hover:text-gray-800
+                     dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
+            >
+              Crear vacante
+            </Link>
+
+            <Link
+              :href="route('vacancies.my')"
+              class="block ps-3 pe-4 py-2 text-base font-medium
+                     text-gray-600 hover:bg-gray-50 hover:text-gray-800
+                     dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
+            >
+              Mis vacantes
+            </Link>
+          </template>
         </div>
 
         <div class="border-t border-gray-200 pb-1 pt-4 dark:border-gray-800">

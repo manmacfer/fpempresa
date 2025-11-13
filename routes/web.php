@@ -12,17 +12,30 @@ use App\Http\Controllers\CompanyController;
 
 Route::get('/', fn () => redirect()->route('dashboard'));
 
-// Área privada (requiere login + email verificado)
 Route::middleware(['auth', 'verified'])->group(function () {
-
     // Dashboard
     Route::get('/dashboard', [VacancyController::class, 'dashboard'])->name('dashboard');
 
-    // Vacantes + aplicaciones
+    // ---- VACANTES (GENERAL) ----
+    // 1) Índice general
     Route::get('/vacantes', [VacancyController::class, 'index'])->name('vacancies.index');
-    Route::get('/vacantes/crear', [VacancyController::class, 'create'])->name('vacancies.create');
-    Route::post('/vacantes', [VacancyController::class, 'store'])->name('vacancies.store');
-    Route::post('/vacantes/{vacancy}/aplicar', [ApplicationController::class, 'store'])->name('applications.store');
+
+    // 2) Rutas SOLO empresa (colocadas ANTES de /vacantes/{vacancy})
+    Route::middleware(['role:company'])->group(function () {
+        Route::get('/vacantes/crear', [VacancyController::class, 'create'])->name('vacancies.create');
+        Route::post('/vacantes',      [VacancyController::class, 'store'])->name('vacancies.store');
+        Route::get('/vacantes/mis',   [VacancyController::class, 'myIndex'])->name('vacancies.my');
+    });
+
+    // 3) Ver una vacante (después de las estáticas y limitado a numérico)
+    Route::get('/vacantes/{vacancy}', [VacancyController::class, 'show'])
+        ->whereNumber('vacancy')
+        ->name('vacancies.show');
+
+    // Aplicaciones (alumno aplica a una vacante)
+    Route::post('/vacantes/{vacancy}/aplicar', [ApplicationController::class, 'store'])
+        ->whereNumber('vacancy')
+        ->name('applications.store');
 
     // Matchings (API + atajos de estado)
     Route::apiResource('matchings', MatchingController::class);
@@ -31,13 +44,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- PERFIL ALUMNO (sin ID) ---
     Route::middleware(['role:student'])->group(function () {
-        // GET cómodo: /students/me -> /students/me/edit
         Route::get('/students/me', fn () => redirect()->route('students.edit.me'))->name('students.me.redirect');
-
         Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
         Route::match(['post', 'put', 'patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
 
-        // Formación (historial) del alumno autenticado
+        // Formación del alumno autenticado
         Route::post('/students/me/educations', [StudentEducationController::class, 'store'])->name('students.educations.store');
         Route::patch('/students/me/educations/{education}', [StudentEducationController::class, 'update'])->name('students.educations.update');
         Route::delete('/students/me/educations/{education}', [StudentEducationController::class, 'destroy'])->name('students.educations.destroy');
@@ -50,15 +61,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // --- PERFIL EMPRESA (sin ID) ---
     Route::middleware(['role:company'])->group(function () {
-        // GET cómodo: /companies/me -> /companies/me/edit
         Route::get('/companies/me', fn () => redirect()->route('companies.edit.me'))->name('companies.me.redirect');
-
         Route::get('/companies/me/edit', [CompanyController::class, 'editMe'])->name('companies.edit.me');
         Route::match(['post', 'put', 'patch'], '/companies/me', [CompanyController::class, 'updateMe'])->name('companies.update.me');
     });
 });
 
-// PÚBLICAS (perfiles visibles sin login)
+// PÚBLICAS (perfiles)
 Route::get('/students/public/{student}', [StudentController::class, 'publicShow'])->name('students.public.show');
 Route::get('/companies/public/{company}', [CompanyController::class, 'publicShow'])->name('companies.public.show');
 

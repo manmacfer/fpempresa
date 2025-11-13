@@ -3,47 +3,120 @@
 namespace App\Http\Controllers;
 
 use App\Models\Vacancy;
-use App\Models\Company;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class VacancyController extends Controller
 {
-    public function dashboard()
+    // Tu dashboard actual (ajústalo si ya tenías lógica distinta)
+    public function dashboard(Request $request)
     {
-        return Inertia::render('Dashboard', ['role' => auth()->user()->role]);
+        return Inertia::render('Dashboard', [
+            'role' => $request->user()?->role ?? null,
+        ]);
     }
 
-    public function index(Request $r)
+    // Listado general (para alumnos ver publicadas, por ejemplo)
+    public function index(Request $request)
     {
-        $q = Vacancy::query()->latest();
-        if ($r->filled('ciclo')) $q->where('ciclo_requerido', $r->ciclo);
-        if ($r->filled('modalidad')) $q->where('modalidad', $r->modalidad);
-        if ($r->filled('ubicacion')) $q->where('ubicacion', 'like', '%' . $r->ubicacion . '%');
+        $q = Vacancy::query()
+            ->with('company:id,trade_name,legal_name,city,province')
+            ->where('status', 'published')
+            ->latest('published_at');
+
+        // pequeños filtros rápidos (opcionales)
+        if ($cycle = $request->input('cycle')) {
+            $q->where('cycle_required', $cycle);
+        }
+        if ($mode = $request->input('mode')) {
+            $q->where('mode', $mode);
+        }
+        if ($city = $request->input('city')) {
+            $q->where('city', 'like', '%'.$city.'%');
+        }
+
+        $vacancies = $q->paginate(12)->withQueryString();
+
         return Inertia::render('Vacancies/Index', [
-            'filters' => $r->only('ciclo', 'modalidad', 'ubicacion'),
-            'vacantes' => $q->paginate(10),
+            'vacancies' => $vacancies,
+            'filters'   => [
+                'cycle' => $cycle ?? null,
+                'mode'  => $mode ?? null,
+                'city'  => $city ?? null,
+            ],
         ]);
     }
 
-    public function create()
+    // Solo empresa: formulario de creación
+    public function create(Request $request)
     {
-        abort_unless(auth()->user()->isEmpresa() || auth()->user()->isAdmin(), 403);
-        return Inertia::render('Vacancies/Create');
+        // asumimos middleware role:company en la ruta
+        return Inertia::render('Vacancies/Create', [
+            'defaults' => [
+                'mode' => 'onsite',
+                'paid' => false,
+                'status' => 'draft',
+            ],
+        ]);
     }
 
-    public function store(Request $r)
+    // Solo empresa: guardar
+    public function store(Request $request)
     {
-        abort_unless(auth()->user()->isEmpresa() || auth()->user()->isAdmin(), 403);
-        $data = $r->validate([
-            'title' => 'required|string|max:150',
-            'description' => 'nullable|string',
-            'ciclo_requerido' => 'required|string|max:20',
-            'modalidad' => 'required|string|in:presencial,híbrido,remoto',
-            'ubicacion' => 'nullable|string|max:120',
+        $user = $request->user();
+        $company = $user->company()->firstOrFail();
+
+        $data = $request->validate([
+            'title'          => ['required','string','max:180'],
+            'description'    => ['nullable','string'],
+            'cycle_required' => ['nullable','string','max:50'],
+            'mode'           => ['nullable','in:onsite,remote,hybrid'],
+            'city'           => ['nullable','string','max:100'],
+            'province'       => ['nullable','string','max:100'],
+            'hours_per_week' => ['nullable','integer','min:1','max:40'],
+            'duration_weeks' => ['nullable','integer','min:1','max:52'],
+            'paid'           => ['boolean'],
+            'salary_month'   => ['nullable','integer','min:0','max:100000'],
+            'tech_stack'     => ['nullable','array'],
+            'tech_stack.*'   => ['string','max:50'],
+            'soft_skills'    => ['nullable','array'],
+            'soft_skills.*'  => ['string','max:50'],
+            'status'         => ['nullable','in:draft,published,closed'],
         ]);
-        $company = Company::firstOrCreate(['user_id' => auth()->id()], ['name' => auth()->user()->name]);
-        Vacancy::create($data + ['company_id' => $company->id, 'status' => 'abierta']);
-        return redirect()->route('vacancies.index')->with('success', 'Vacante creada.');
+
+        $data['company_id'] = $company->id;
+
+        if (($data['status'] ?? 'draft') === 'published' && empty($data['published_at'])) {
+            $data['published_at'] = now();
+        }
+
+        $vacancy = Vacancy::create($data);
+
+        return redirect()->route('vacancies.my')->with('success', 'Vacante creada.');
+    }
+
+    // Solo empresa: mis vacantes
+    public function myIndex(Request $request)
+    {
+        $companyId = $request->user()->company()->value('id');
+
+        $vacancies = Vacancy::query()
+            ->where('company_id', $companyId)
+            ->latest('created_at')
+            ->paginate(12);
+
+        return Inertia::render('Vacancies/MyIndex', [
+            'vacancies' => $vacancies,
+        ]);
+    }
+
+    // Ver una vacante (alumno o empresa)
+    public function show(Vacancy $vacancy)
+    {
+        $vacancy->load('company:id,trade_name,legal_name,city,province,website');
+
+        return Inertia::render('Vacancies/Show', [
+            'vacancy' => $vacancy,
+        ]);
     }
 }
