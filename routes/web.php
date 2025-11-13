@@ -10,9 +10,11 @@ use App\Http\Controllers\StudentEducationController;
 use App\Http\Controllers\StudentExperienceController;
 use App\Http\Controllers\CompanyController;
 
-Route::get('/', fn() => redirect()->route('dashboard'));
+Route::get('/', fn () => redirect()->route('dashboard'));
 
+// Área privada (requiere login + email verificado)
 Route::middleware(['auth', 'verified'])->group(function () {
+
     // Dashboard
     Route::get('/dashboard', [VacancyController::class, 'dashboard'])->name('dashboard');
 
@@ -28,40 +30,36 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('matchings/{matching}/reject', [MatchingController::class, 'reject'])->name('matchings.reject');
 
     // --- PERFIL ALUMNO (sin ID) ---
-    Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
-    Route::match(['post', 'patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
+    Route::middleware(['role:student'])->group(function () {
+        // GET cómodo: /students/me -> /students/me/edit
+        Route::get('/students/me', fn () => redirect()->route('students.edit.me'))->name('students.me.redirect');
 
-    // Perfil público
-    Route::get('/students/public/{student}', [StudentController::class, 'publicShow'])->name('students.public.show');
+        Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
+        Route::match(['post', 'put', 'patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
 
-    // Formación (historial) del alumno autenticado
-    Route::post('/students/me/educations', [StudentEducationController::class, 'store'])->name('students.educations.store');
-    Route::patch('/students/me/educations/{education}', [StudentEducationController::class, 'update'])->name('students.educations.update');
-    Route::delete('/students/me/educations/{education}', [StudentEducationController::class, 'destroy'])->name('students.educations.destroy');
+        // Formación (historial) del alumno autenticado
+        Route::post('/students/me/educations', [StudentEducationController::class, 'store'])->name('students.educations.store');
+        Route::patch('/students/me/educations/{education}', [StudentEducationController::class, 'update'])->name('students.educations.update');
+        Route::delete('/students/me/educations/{education}', [StudentEducationController::class, 'destroy'])->name('students.educations.destroy');
 
-    // Experiencia del alumno autenticado
-    Route::post('/students/me/experiences', [StudentExperienceController::class, 'store'])->name('students.experiences.store');
-    Route::patch('/students/me/experiences/{experience}', [StudentExperienceController::class, 'update'])->name('students.experiences.update');
-    Route::delete('/students/me/experiences/{experience}', [StudentExperienceController::class, 'destroy'])->name('students.experiences.destroy');
-
-    // Perfil propio de empresa
-    Route::get('/companies/me/edit', [CompanyController::class, 'editMe'])->name('companies.edit.me');
-    Route::match(['post', 'patch'], '/companies/me', [CompanyController::class, 'updateMe'])->name('companies.update.me');
-
-
-    // Perfil público de empresa
-    Route::get('/companies/public/{company}', [CompanyController::class, 'publicShow'])->name('companies.public.show');
-
-
-    Route::middleware(['auth', 'role:company'])->group(function () {
-        Route::get('/companies/me/edit', [CompanyController::class, 'editMe'])->name('companies.edit.me');
-        Route::put('/companies/me',      [CompanyController::class, 'updateMe'])->name('companies.update.me');
+        // Experiencia del alumno autenticado
+        Route::post('/students/me/experiences', [StudentExperienceController::class, 'store'])->name('students.experiences.store');
+        Route::patch('/students/me/experiences/{experience}', [StudentExperienceController::class, 'update'])->name('students.experiences.update');
+        Route::delete('/students/me/experiences/{experience}', [StudentExperienceController::class, 'destroy'])->name('students.experiences.destroy');
     });
 
-    Route::middleware(['auth', 'role:student'])->group(function () {
-        Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
-        Route::put('/students/me',      [StudentController::class, 'updateMe'])->name('students.update.me');
+    // --- PERFIL EMPRESA (sin ID) ---
+    Route::middleware(['role:company'])->group(function () {
+        // GET cómodo: /companies/me -> /companies/me/edit
+        Route::get('/companies/me', fn () => redirect()->route('companies.edit.me'))->name('companies.me.redirect');
+
+        Route::get('/companies/me/edit', [CompanyController::class, 'editMe'])->name('companies.edit.me');
+        Route::match(['post', 'put', 'patch'], '/companies/me', [CompanyController::class, 'updateMe'])->name('companies.update.me');
     });
 });
+
+// PÚBLICAS (perfiles visibles sin login)
+Route::get('/students/public/{student}', [StudentController::class, 'publicShow'])->name('students.public.show');
+Route::get('/companies/public/{company}', [CompanyController::class, 'publicShow'])->name('companies.public.show');
 
 require __DIR__ . '/auth.php';

@@ -1,154 +1,179 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { useForm, Link } from '@inertiajs/vue3'
+import { Link, useForm, usePage } from '@inertiajs/vue3'
+import { computed } from 'vue'
 
-const props = defineProps({ company: { type: Object, required: true } })
-
-const form = useForm({
-  name: props.company?.name || '',
-  city: props.company?.city || '',
-  website: props.company?.website || '',
-  description: props.company?.description || '',
-  sectors: props.company?.sectors ? [...props.company.sectors] : [],
-  avatar: null,
-  newSector: '',
+const props = defineProps({
+  company: {
+    type: Object,
+    required: true,
+    // Esperado desde el controlador: id, legal_name, trade_name, cif, sector, website, linkedin,
+    // phone, city, province, postal_code, contact_name, contact_email, description
+  },
 })
 
-function addSector() {
-  const v = (form.newSector || '').trim()
-  if (!v) return
-  form.sectors.push(v)
-  form.newSector = ''
-}
-function removeSector(i) {
-  form.sectors.splice(i, 1)
-}
+const page = usePage()
+const flash = computed(() => page.props.flash || {})
+
+const form = useForm({
+  legal_name:   props.company?.legal_name   ?? '',
+  trade_name:   props.company?.trade_name   ?? '',
+  cif:          props.company?.cif          ?? '',
+  sector:       props.company?.sector       ?? '',
+  website:      props.company?.website      ?? '',
+  linkedin:     props.company?.linkedin     ?? '',
+  phone:        props.company?.phone        ?? '',
+  city:         props.company?.city         ?? '',
+  province:     props.company?.province     ?? '',
+  postal_code:  props.company?.postal_code  ?? '',
+  contact_name: props.company?.contact_name ?? '',
+  contact_email:props.company?.contact_email?? '',
+  description:  props.company?.description  ?? '',
+})
 
 function submit() {
-  const hasFile = !!form.avatar
-  const req = form.transform(d => ({ ...d }))
-  if (hasFile) req.post(route('companies.update.me'), { forceFormData: true })
-  else req.post(route('companies.update.me'))
+  // Evitamos depender de Ziggy: URL directa
+  form.put('/companies/me', {
+    preserveScroll: true,
+  })
 }
+
+const publicUrl = computed(() => `/companies/${props.company.id}`)
 </script>
 
 <template>
   <AuthenticatedLayout>
-    <template #header>
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">Mi empresa</h2>
-        <Link
-          v-if="company?.id"
-          :href="route('companies.public.show', company.id)"
-          class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
-        >
-          Ver perfil público
-        </Link>
-      </div>
-    </template>
-
-    <div class="mx-auto max-w-5xl space-y-6 p-6">
-      <!-- Datos básicos -->
-      <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <h3 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Datos básicos</h3>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div class="sm:col-span-2">
-            <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Nombre de la empresa</label>
-            <input
-              v-model="form.name"
-              type="text"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900
-                     dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            />
-            <div v-if="form.errors.name" class="mt-1 text-xs text-red-600">{{ form.errors.name }}</div>
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Ciudad</label>
-            <input
-              v-model="form.city"
-              type="text"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900
-                     dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            />
-          </div>
-          <div>
-            <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Web</label>
-            <input
-              v-model="form.website"
-              type="url"
-              placeholder="https://..."
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900
-                     dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            />
-            <div v-if="form.errors.website" class="mt-1 text-xs text-red-600">{{ form.errors.website }}</div>
-          </div>
-          <div class="sm:col-span-2">
-            <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Descripción</label>
-            <textarea
-              v-model="form.description"
-              rows="4"
-              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900
-                     dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Logo / Avatar</label>
-            <input
-              type="file"
-              accept="image/png,image/jpeg"
-              @change="e => form.avatar = e.target.files?.[0] || null"
-              class="block w-full text-sm text-gray-700 file:me-3 file:rounded-md file:border-0 file:bg-gray-900 file:px-3 file:py-2 file:text-white hover:file:bg-gray-800 dark:text-gray-300 dark:file:bg-gray-100 dark:file:text-gray-900 dark:hover:file:bg-gray-200"
-            />
-            <p v-if="company?.avatar_url" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-              Logo actual: <span class="underline">{{ company.avatar_url }}</span>
-            </p>
-          </div>
+    <div class="max-w-5xl mx-auto p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h1 class="text-2xl font-semibold text-gray-900 dark:text-gray-100">Editar perfil de empresa</h1>
+          <p class="text-sm text-gray-500 dark:text-gray-400">Completa tu ficha pública para que los alumnos te conozcan.</p>
         </div>
-      </section>
-
-      <!-- Sectores -->
-      <section class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-        <h3 class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Sectores</h3>
-        <div class="flex flex-wrap gap-2">
-          <input
-            v-model="form.newSector"
-            type="text"
-            placeholder="Ej. Desarrollo de software"
-            class="w-64 rounded-lg border border-gray-300 px-3 py-2 text-gray-900
-                   dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            @keyup.enter="addSector"
-          />
-          <button
-            type="button"
-            @click="addSector"
-            class="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-gray-100 dark:text-gray-900"
-          >
-            Añadir
+        <div class="flex items-center gap-2">
+          <Link :href="publicUrl"
+                class="px-3 py-2 rounded-xl border border-gray-300 text-gray-700 hover:bg-gray-50
+                       dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-800">
+            Ver perfil público
+          </Link>
+          <button @click="submit"
+                  :disabled="form.processing"
+                  class="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">
+            Guardar
           </button>
         </div>
-        <div class="mt-2 flex flex-wrap gap-2">
-          <span
-            v-for="(s,i) in form.sectors"
-            :key="`${s}-${i}`"
-            class="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-          >
-            {{ s }}
-            <button class="ms-2 text-gray-500" @click="removeSector(i)">✕</button>
-          </span>
-        </div>
-      </section>
+      </div>
 
-      <div class="flex items-center justify-end gap-3">
-        <span v-if="$page.props.flash?.success" class="text-sm text-green-700 dark:text-green-400">
-          {{ $page.props.flash.success }}
-        </span>
-        <button
-          type="button"
-          @click="submit"
-          :disabled="form.processing"
-          class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50 dark:bg-indigo-500"
-        >
-          Guardar
+      <div v-if="flash.success" class="mb-4 rounded-xl bg-green-50 text-green-800 px-4 py-3
+                                       dark:bg-green-900/30 dark:text-green-200">
+        {{ flash.success }}
+      </div>
+      <div v-if="Object.keys(form.errors).length"
+           class="mb-4 rounded-xl bg-red-50 text-red-800 px-4 py-3
+                  dark:bg-red-900/30 dark:text-red-200">
+        <ul class="list-disc ml-5 space-y-1">
+          <li v-for="(msg, key) in form.errors" :key="key">{{ msg }}</li>
+        </ul>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Columna 1: Identidad -->
+        <section class="lg:col-span-2 rounded-2xl bg-white dark:bg-gray-800 shadow p-6 space-y-5">
+          <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Identidad</h2>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Nombre comercial</label>
+              <input v-model="form.trade_name" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Nombre legal</label>
+              <input v-model="form.legal_name" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">CIF</label>
+              <input v-model="form.cif" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Sector</label>
+              <input v-model="form.sector" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Web</label>
+              <input v-model="form.website" type="url" placeholder="https://..."
+                     class="mt-1 w-full rounded-lg border-gray-300
+                     dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">LinkedIn</label>
+              <input v-model="form.linkedin" type="url" placeholder="https://linkedin.com/company/..."
+                     class="mt-1 w-full rounded-lg border-gray-300
+                     dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-600 dark:text-gray-300">Descripción</label>
+            <textarea v-model="form.description" rows="5"
+                      class="mt-1 w-full rounded-lg border-gray-300
+                      dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"></textarea>
+          </div>
+        </section>
+
+        <!-- Columna 2: Contacto -->
+        <aside class="rounded-2xl bg-white dark:bg-gray-800 shadow p-6 space-y-5">
+          <h2 class="text-lg font-medium text-gray-900 dark:text-gray-100">Contacto</h2>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Teléfono</label>
+              <input v-model="form.phone" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2">
+              <div>
+                <label class="block text-sm text-gray-600 dark:text-gray-300">CP</label>
+                <input v-model="form.postal_code" class="mt-1 w-full rounded-lg border-gray-300
+                     dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+              </div>
+              <div>
+                <label class="block text-sm text-gray-600 dark:text-gray-300">Ciudad</label>
+                <input v-model="form.city" class="mt-1 w-full rounded-lg border-gray-300
+                     dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+              </div>
+              <div>
+                <label class="block text-sm text-gray-600 dark:text-gray-300">Provincia</label>
+                <input v-model="form.province" class="mt-1 w-full rounded-lg border-gray-300
+                     dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Persona de contacto</label>
+              <input v-model="form.contact_name" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+
+            <div>
+              <label class="block text-sm text-gray-600 dark:text-gray-300">Email de contacto</label>
+              <input v-model="form.contact_email" type="email" class="mt-1 w-full rounded-lg border-gray-300
+                   dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"/>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="flex justify-end mt-6">
+        <button @click="submit"
+                :disabled="form.processing"
+                class="px-4 py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">
+          Guardar cambios
         </button>
       </div>
     </div>
