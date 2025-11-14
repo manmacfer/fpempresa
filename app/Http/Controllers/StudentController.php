@@ -8,7 +8,6 @@ use App\Models\Language;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class StudentController extends Controller
@@ -21,29 +20,18 @@ class StudentController extends Controller
         $student->load([
             'educations'  => fn ($q) => $q->orderBy('start_date', 'desc'),
             'experiences' => fn ($q) => $q->orderBy('start_date', 'desc'),
-            // relaciones que usa la compatibilidad
             'competencies',
             'languages',
         ]);
 
         // Catálogos: los MISMOS que usan las vacantes
-
-        // OJO: en la tabla competencies NO hay 'name', solo 'nombre'
         $competencies = Competency::query()
-            ->select('id', 'slug', DB::raw('nombre as name'))
             ->orderBy('nombre')
-            ->get();
+            ->get(['id', 'slug', 'nombre as name']);
 
-        // En languages tienes columnas antiguas (nombre, codigo)
-        // y nuevas (name, code). Normalizamos a name/code para el front.
         $languages = Language::query()
-            ->select(
-                'id',
-                DB::raw('COALESCE(name, nombre) as name'),
-                DB::raw('COALESCE(code, codigo) as code')
-            )
-            ->orderBy('name')
-            ->get();
+            ->orderBy('nombre')
+            ->get(['id', 'codigo as code', 'nombre as name']);
 
         return Inertia::render('Students/Edit', [
             'student'         => $this->toResource($student),
@@ -56,7 +44,6 @@ class StudentController extends Controller
     {
         $student = Student::firstOrCreate(['user_id' => $request->user()->id]);
 
-        // Log para ver exactamente qué llega (útil si algo sigue sin guardarse)
         Log::info('students.update.me payload', $request->all());
 
         $data = $request->validate([
@@ -66,7 +53,8 @@ class StudentController extends Controller
             'birth_date'          => ['nullable', 'date'],
             'address'             => ['nullable', 'string', 'max:255'],
             'postal_code'         => ['nullable', 'string', 'max:20'],
-            'city'                => ['nullable', 'string', 'max:100'],
+            'city'                => ['nullable', 'string', 'max:100'],   // municipio/población
+            'province'            => ['nullable', 'string', 'max:100'],
             'has_driver_license'  => ['nullable', 'boolean'],
             'has_vehicle'         => ['nullable', 'boolean'],
 
@@ -86,33 +74,28 @@ class StudentController extends Controller
             'relocate_cities.*'   => ['string'],
             'transport_own'       => ['nullable', 'boolean'],
             'work_modality'       => ['nullable', 'in:presencial,remota,hibrida'],
-            'work_modalities'     => ['nullable', 'array'],      // si usas multiselección
-            'work_modalities.*'   => ['string'],
             'remote_days'         => ['nullable', 'integer', 'min:0', 'max:7'],
             'days_per_week'       => ['nullable', 'integer', 'min:1', 'max:7'],
             'available_from'      => ['nullable', 'date'],
 
-            // intereses / perfil (JSON “decorativo”, no de cotejo fuerte)
+            // intereses / perfil (texto libre)
             'sectors'                 => ['nullable', 'array'],
             'sectors.*'               => ['string'],
             'preferred_company_type'  => ['nullable', 'string', 'max:255'],
             'non_formal_experience'   => ['nullable', 'string', 'max:255'],
-
-            // Competencias técnicas e idiomas en JSON libre (para CV/perfil)
             'tech_competencies'       => ['nullable', 'array'],
             'tech_competencies.*'     => ['string'],
-
-            // Soft skills: aquí solo texto libre, NO se usan en compatibilidad
             'soft_skills'             => ['nullable', 'array'],
             'soft_skills.*'           => ['string'],
 
-            // Idiomas libres (para texto en perfil)
-            'languages'               => ['nullable', 'array'],
-            'languages.*.name'        => ['required_with:languages', 'string', 'max:100'],
-            'languages.*.level'       => ['nullable', 'string', 'max:50'],
+            // COMPATIBILIDAD: competencias técnicas (catálogo)
+            'competency_ids'          => ['nullable', 'array'],
+            'competency_ids.*'        => ['integer', 'exists:competencies,id'],
 
-            'certifications'          => ['nullable', 'array'],
-            'certifications.*'        => ['string'],
+            // COMPATIBILIDAD: idiomas (catálogo + nivel)
+            'languages'               => ['nullable', 'array'],
+            'languages.*.language_id' => ['required', 'integer', 'exists:languages,id'],
+            'languages.*.level'       => ['required', 'in:A1,A2,B1,B2,C1,C2'],
 
             // extra
             'hobbies'             => ['nullable', 'string', 'max:255'],
@@ -134,6 +117,11 @@ class StudentController extends Controller
             'other_certs.*'       => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:8192'],
         ]);
 
+        // Sacamos arrays de relaciones antes del fill
+        $competencyIds   = $data['competency_ids'] ?? null;
+        $languagePayload = $data['languages'] ?? null;
+        unset($data['competency_ids'], $data['languages']);
+
         // Subida de ficheros (si vienen)
         if ($request->hasFile('avatar')) {
             if ($student->avatar_path) {
@@ -141,21 +129,18 @@ class StudentController extends Controller
             }
             $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
         }
-
         if ($request->hasFile('cv')) {
             if ($student->cv_path) {
                 Storage::disk('public')->delete($student->cv_path);
             }
             $data['cv_path'] = $request->file('cv')->store('cv', 'public');
         }
-
         if ($request->hasFile('cover_letter')) {
             if ($student->cover_letter_path) {
                 Storage::disk('public')->delete($student->cover_letter_path);
             }
             $data['cover_letter_path'] = $request->file('cover_letter')->store('cover_letters', 'public');
         }
-
         if ($request->hasFile('other_certs')) {
             $paths = [];
             foreach ($request->file('other_certs') as $file) {
@@ -164,20 +149,25 @@ class StudentController extends Controller
             $data['other_certs_paths'] = $paths;
         }
 
-        // Guardar campos simples / JSON en students
+        // Guarda campos "simples"
         $student->fill($data);
         $student->saveOrFail();
 
-        // OJO: aquí SOLO he tocado lo mínimo. Si quieres que el formulario
-        // de competencias técnicas / idiomas “de catálogo” alinee también
-        // con los pivotes alumno_competencia / alumno_idioma para la
-        // compatibilidad, aquí añadiríamos un sync() aparte.
-        // De momento no lo toco para no liarte más, pero si quieres, en la
-        // siguiente iteración lo dejamos fino.
+        // Sincroniza competencias técnicas (catálogo)
+        if ($competencyIds !== null) {
+            $student->competencies()->sync($competencyIds);
+        }
 
-        return redirect()
-            ->route('students.edit.me')
-            ->with('success', 'Perfil guardado.');
+        // Sincroniza idiomas (pivot alumno_idioma)
+        if ($languagePayload !== null) {
+            $syncData = [];
+            foreach ($languagePayload as $row) {
+                $syncData[$row['language_id']] = ['nivel' => $row['level']];
+            }
+            $student->languages()->sync($syncData);
+        }
+
+        return redirect()->route('students.edit.me')->with('success', 'Perfil guardado.');
     }
 
     public function publicShow(Student $student)
@@ -185,6 +175,8 @@ class StudentController extends Controller
         $student->load([
             'educations'  => fn ($q) => $q->orderBy('start_date', 'desc'),
             'experiences' => fn ($q) => $q->orderBy('start_date', 'desc'),
+            'competencies',
+            'languages',
         ]);
 
         return Inertia::render('Students/PublicShow', [
@@ -192,9 +184,18 @@ class StudentController extends Controller
         ]);
     }
 
-    // ===== Resources =====
+        // ===== Resources =====
     protected function toResource(Student $s): array
     {
+        // Forzamos a usar SIEMPRE las relaciones, no un posible atributo array
+        $competenciesRel = $s->relationLoaded('competencies')
+            ? $s->getRelation('competencies')
+            : $s->competencies()->get();
+
+        $languagesRel = $s->relationLoaded('languages')
+            ? $s->getRelation('languages')
+            : $s->languages()->get();
+
         return [
             'id'                  => $s->id,
             // personales
@@ -204,7 +205,8 @@ class StudentController extends Controller
             'birth_date'          => optional($s->birth_date)?->format('Y-m-d'),
             'address'             => $s->address,
             'postal_code'         => $s->postal_code,
-            'city'                => $s->city,
+            'city'                => $s->city,    // municipio/población
+            'province'            => $s->province,
             'has_driver_license'  => $s->has_driver_license,
             'has_vehicle'         => $s->has_vehicle,
             // académicos
@@ -220,17 +222,15 @@ class StudentController extends Controller
             'relocate_cities'     => $s->relocate_cities ?? [],
             'transport_own'       => $s->transport_own,
             'work_modality'       => $s->work_modality,
-            'work_modalities'     => $s->work_modalities ?? [],
             'remote_days'         => $s->remote_days,
             'days_per_week'       => $s->days_per_week,
             'available_from'      => optional($s->available_from)?->format('Y-m-d'),
-            // intereses
+            // intereses (texto libre)
             'sectors'                 => $s->sectors ?? [],
             'preferred_company_type'  => $s->preferred_company_type,
             'non_formal_experience'   => $s->non_formal_experience,
             'tech_competencies'       => $s->tech_competencies ?? [],
             'soft_skills'             => $s->soft_skills ?? [],
-            'languages'               => $s->languages ?? [],
             'certifications'          => $s->certifications ?? [],
             // extra
             'hobbies'             => $s->hobbies,
@@ -244,7 +244,7 @@ class StudentController extends Controller
             'link_video'          => $s->link_video,
             // ficheros
             'avatar_url'          => $s->avatar_url,
-            // relaciones
+            // relaciones para ficha
             'educations' => $s->educations->map(fn ($e) => [
                 'id'         => $e->id,
                 'title'      => $e->title,
@@ -253,20 +253,31 @@ class StudentController extends Controller
                 'end_date'   => optional($e->end_date)?->format('Y-m-d'),
             ])->values(),
             'experiences' => $s->experiences->map(fn ($x) => [
-                'id'            => $x->id,
-                'company'       => $x->company,
-                'position'      => $x->position,
-                'start_date'    => optional($x->start_date)?->format('Y-m-d'),
-                'end_date'      => optional($x->end_date)?->format('Y-m-d'),
-                'functions'     => $x->functions,
-                'is_non_formal' => $x->is_non_formal,
+                'id'           => $x->id,
+                'company'      => $x->company,
+                'position'     => $x->position,
+                'start_date'   => optional($x->start_date)?->format('Y-m-d'),
+                'end_date'     => optional($x->end_date)?->format('Y-m-d'),
+                'functions'    => $x->functions,
+                'is_non_formal'=> $x->is_non_formal,
+            ])->values(),
+            // relaciones para compatibilidad (ya como catálogo)
+            'competencies' => $competenciesRel->map(fn ($c) => [
+                'id'   => $c->id,
+                'slug' => $c->slug,
+                'name' => $c->nombre ?? $c->name,
+            ])->values(),
+            'languages' => $languagesRel->map(fn ($l) => [
+                'id'    => $l->id,
+                'code'  => $l->codigo ?? $l->code,
+                'name'  => $l->nombre ?? $l->name,
+                'level' => $l->pivot->nivel ?? null,
             ])->values(),
         ];
     }
 
     protected function toPublicResource(Student $s): array
     {
-        // La vista pública oculta vacíos; devolvemos lo mismo
         return $this->toResource($s);
     }
 }
