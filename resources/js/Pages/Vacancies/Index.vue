@@ -197,12 +197,13 @@ const scoreOf = (v) => {
             :key="v.id"
             class="rounded-2xl border border-gray-100 bg-white p-5 shadow transition hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
           >
+            <!-- Cabecera de la tarjeta -->
             <div class="flex items-start justify-between gap-3">
               <h3 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
                 {{ v.title }}
               </h3>
 
-              <!-- Etiquetas (modalidad + compatibilidad si viene del backend) -->
+              <!-- Etiqueta de modalidad (solo modalidad aquí, SIN compatibilidad) -->
               <div class="flex shrink-0 items-center gap-1">
                 <span
                   v-if="modalidadDe(v)"
@@ -210,16 +211,10 @@ const scoreOf = (v) => {
                 >
                   {{ formatMode(modalidadDe(v)) }}
                 </span>
-                <span
-                  v-if="scoreOf(v) !== null"
-                  class="rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white"
-                  :title="'Compatibilidad'"
-                >
-                  {{ scoreOf(v) }}%
-                </span>
               </div>
             </div>
 
+            <!-- Datos básicos -->
             <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
               <div class="flex items-center gap-2">
                 <span class="inline-flex h-2 w-2 rounded-full bg-gray-400"></span>
@@ -233,30 +228,51 @@ const scoreOf = (v) => {
               </div>
             </div>
 
-            <div class="mt-4 flex items-center justify-between">
-              <div class="text-xs text-gray-500 dark:text-gray-400">
-                Publicada: {{ createdDe(v) }}
+            <!-- Parte inferior: fecha + botones izquierda / compatibilidad abajo derecha -->
+            <div class="mt-4 flex items-end justify-between">
+              <div>
+                <div class="text-xs text-gray-500 dark:text-gray-400">
+                  Publicada: {{ createdDe(v) }}
+                </div>
+
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <!-- Aplicar (solo alumnos) -->
+                  <button
+                    v-if="isStudent"
+                    @click="aplicar(v.id)"
+                    class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium
+                           text-white bg-indigo-600 hover:bg-indigo-700
+                           focus:outline-none focus:ring-2 focus:ring-indigo-500/50
+                           dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus:ring-indigo-400/40"
+                  >
+                    Aplicar
+                  </button>
+
+                  <!-- Ver más -->
+                  <Link
+                    :href="route().has && route().has('vacancies.show') ? route('vacancies.show', v.id) : `/vacantes/${v.id}`"
+                    class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
+                  >
+                    Ver más
+                  </Link>
+                </div>
               </div>
 
-              <!-- Aplicar (solo alumnos) -->
-              <button
-                v-if="isStudent"
-                @click="aplicar(v.id)"
-                class="inline-flex items-center rounded-xl px-3 py-2 text-sm font-medium
-                       text-white bg-indigo-600 hover:bg-indigo-700
-                       focus:outline-none focus:ring-2 focus:ring-indigo-500/50
-                       dark:bg-indigo-500 dark:hover:bg-indigo-400 dark:focus:ring-indigo-400/40"
+              <!-- Compatibilidad abajo a la derecha -->
+              <div
+                v-if="scoreOf(v) !== null"
+                class="flex flex-col items-end text-right"
               >
-                Aplicar
-              </button>
-
-              <!-- Ver más -->
-              <Link
-                :href="route().has && route().has('vacancies.show') ? route('vacancies.show', v.id) : `/vacantes/${v.id}`"
-                class="text-sm text-indigo-600 hover:underline dark:text-indigo-400"
-              >
-                Ver más
-              </Link>
+                <span class="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                  Compatibilidad
+                </span>
+                <span
+                  class="mt-1 inline-flex items-center rounded-full bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white"
+                  :title="'Compatibilidad con esta vacante'"
+                >
+                  {{ scoreOf(v) }}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
