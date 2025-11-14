@@ -5,106 +5,69 @@ namespace App\Services;
 use App\Models\Student;
 use App\Models\Vacancy;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class CompatibilityService
 {
-    // Pesos (suman 100)
-    private const WEIGHT_TECH      = 45;
-    private const WEIGHT_CYCLE_FP  = 20;
-    private const WEIGHT_SCHEDULE  = 10;
-    private const WEIGHT_MODE      = 10;
-    private const WEIGHT_LOCATION  = 5;
-    private const WEIGHT_LANG      = 10;
-
-    private const DEFAULT_MIN_SCORE = 50;
-
     /**
-     * Calcula compatibilidad para TODAS las vacantes publicadas/abiertas
-     * para un alumno, devolviendo solo las de score >= $minScore.
+     * Vacantes publicadas para un alumno, con score >= $minScore,
+     * ordenadas por compatibilidad desc.
      */
-    public function forStudent(Student $student, int $minScore = self::DEFAULT_MIN_SCORE): Collection
+    public function forStudent(Student $student, int $minScore = 0, array $filters = []): Collection
     {
-        $vacancies = Vacancy::query()
-            ->where('status', 'published')
-            ->where('estado_vacante', 'ABIERTA')
+        $query = Vacancy::query()
             ->with('company')
-            ->get();
+            ->where('status', 'published');
 
-        if ($vacancies->isEmpty()) {
-            return collect();
+        // Filtro por ciclo (texto libre: "DAM", "DAW", "1 DAW"...)
+        if (!empty($filters['ciclo'])) {
+            $value = trim($filters['ciclo']);
+            $query->where(function ($q) use ($value) {
+                $q->where('cycle_required', 'LIKE', "%{$value}%")
+                  ->orWhereNull('cycle_required');
+            });
         }
 
-        // Contexto del alumno (una sola vez)
-        $studentCompetencies = $this->loadStudentCompetencies($student->id);
-        $studentLanguages    = $this->loadStudentLanguages($student->id);
-
-        // Contexto de vacantes (también en bloque)
-        $vacancyIds          = $vacancies->pluck('id');
-        $vacancyCompetencies = $this->loadVacancyCompetencies($vacancyIds);
-        $vacancyLanguages    = $this->loadVacancyLanguages($vacancyIds);
-
-        $results = [];
-
-        foreach ($vacancies as $vacancy) {
-            $scoreData = $this->scoreWithContext(
-                $student,
-                $vacancy,
-                $studentCompetencies,
-                $studentLanguages,
-                $vacancyCompetencies[$vacancy->id] ?? [],
-                $vacancyLanguages[$vacancy->id] ?? [],
-            );
-
-            if ($scoreData['eligible'] && $scoreData['score'] >= $minScore) {
-                $results[] = array_merge(
-                    ['vacancy' => $vacancy],
-                    $scoreData,
-                );
-            }
+        // Filtro por modalidad (presencial / híbrido / remoto)
+        if (!empty($filters['modalidad'])) {
+            $mod = strtoupper($filters['modalidad']);
+            $query->where('modalidad', $mod);
         }
 
-        return collect($results)
+        // Filtro por ubicación (ciudad o provincia contiene el texto)
+        if (!empty($filters['ubicacion'])) {
+            $ubi = trim($filters['ubicacion']);
+            $query->where(function ($q) use ($ubi) {
+                $q->where('city', 'LIKE', "%{$ubi}%")
+                  ->orWhere('province', 'LIKE', "%{$ubi}%");
+            });
+        }
+
+        $vacancies = $query->get();
+
+        $results = $vacancies
+            ->map(function (Vacancy $vacancy) use ($student) {
+                $scoreData = $this->scoreStudentForVacancy($student, $vacancy);
+
+                return array_merge($scoreData, [
+                    'vacancy' => $vacancy,
+                ]);
+            })
+            ->filter(function (array $row) use ($minScore) {
+                return $row['eligible'] && $row['score'] >= $minScore;
+            })
             ->sortByDesc('score')
             ->values();
+
+        return $results;
     }
 
     /**
-     * Calcula compatibilidad de un alumno concreto con UNA vacante.
-     * Útil para "detalle" en la vista de la vacante.
+     * Calcula el score 0–100 para un alumno concreto y una vacante.
      */
-    public function score(Student $student, Vacancy $vacancy): array
+    public function scoreStudentForVacancy(Student $student, Vacancy $vacancy): array
     {
-        $studentCompetencies = $this->loadStudentCompetencies($student->id);
-        $studentLanguages    = $this->loadStudentLanguages($student->id);
-
-        $vacCompetencies = $this->loadVacancyCompetencies(collect([$vacancy->id]));
-        $vacLanguages    = $this->loadVacancyLanguages(collect([$vacancy->id]));
-
-        return $this->scoreWithContext(
-            $student,
-            $vacancy,
-            $studentCompetencies,
-            $studentLanguages,
-            $vacCompetencies[$vacancy->id] ?? [],
-            $vacLanguages[$vacancy->id] ?? [],
-        );
-    }
-
-    /**
-     * Implementación central del cálculo, recibiendo todos los datos ya cargados.
-     */
-    protected function scoreWithContext(
-        Student $student,
-        Vacancy $vacancy,
-        array $studentCompetencies,
-        array $studentLanguages,
-        array $vacancyCompetencies,
-        array $vacancyLanguages,
-    ): array {
-        // Solo puntuamos vacantes publicadas y abiertas
-        if ($vacancy->status !== 'published' || $vacancy->estado_vacante !== 'ABIERTA') {
+        // 1) Regla dura: solo vacantes publicadas
+        if ($vacancy->status !== 'published') {
             return [
                 'eligible'  => false,
                 'score'     => 0,
@@ -112,456 +75,483 @@ class CompatibilityService
             ];
         }
 
-        // 1) Filtros must: idiomas requeridos
-        if (!$this->checkRequiredLanguages($studentLanguages, $vacancyLanguages)) {
+        // 2) Ciclo + tipo FP (puede dejar la vacante como no elegible)
+        [$cycleFpScore, $cycleFpBreakdown, $eligibleCycleFp] =
+            $this->scoreCycleAndFp($student, $vacancy);
+
+        if (! $eligibleCycleFp) {
             return [
                 'eligible'  => false,
                 'score'     => 0,
-                'breakdown' => [],
+                'breakdown' => [
+                    'cycle_fp' => 0,
+                ],
             ];
         }
 
-        // 2) Filtro must: competencias técnicas obligatorias
-        $eligible = true;
-        $techFactor = $this->scoreTech($studentCompetencies, $vacancyCompetencies, $eligible);
+        // 3) Resto de bloques
+        $availabilityScore = $this->scoreAvailability($student, $vacancy); // 0..1
+        $modalityScore     = $this->scoreModalities($student, $vacancy);   // 0..1
+        $locationScore     = $this->scoreLocation($student, $vacancy);     // 0..1
+        $techScore         = $this->scoreTechnologies($student, $vacancy); // 0..1
+        $langScore         = $this->scoreLanguages($student, $vacancy);    // 0..1
 
-        if (!$eligible) {
-            return [
-                'eligible'  => false,
-                'score'     => 0,
-                'breakdown' => [],
-            ];
-        }
-
-        // 3) Resto de bloques (escala 0–1)
-        $cycleFactor     = $this->scoreCycleAndFp($student, $vacancy);
-        $scheduleFactor  = $this->scoreSchedule($student, $vacancy);
-        $modeFactor      = $this->scoreMode($student, $vacancy);
-        $locationFactor  = $this->scoreLocation($student, $vacancy);
-        $langFactor      = $this->scoreLanguages($studentLanguages, $vacancyLanguages);
-
-        // 4) Montamos breakdown ya ponderado
-        $scores = [
-            'tech'       => (int) round(self::WEIGHT_TECH     * $techFactor),
-            'cycle_fp'   => (int) round(self::WEIGHT_CYCLE_FP * $cycleFactor),
-            'schedule'   => (int) round(self::WEIGHT_SCHEDULE * $scheduleFactor),
-            'mode'       => (int) round(self::WEIGHT_MODE     * $modeFactor),
-            'location'   => (int) round(self::WEIGHT_LOCATION * $locationFactor),
-            'languages'  => (int) round(self::WEIGHT_LANG     * $langFactor),
+        // 4) Pesos de cada bloque (suma 100)
+        $weights = [
+            'cycle_fp'     => 25,
+            'availability' => 5,
+            'modality'     => 10,
+            'location'     => 10,
+            'tech'         => 40,
+            'languages'    => 10,
         ];
 
-        $total = array_sum($scores);
+        $total =
+              $cycleFpScore      * $weights['cycle_fp']
+            + $availabilityScore * $weights['availability']
+            + $modalityScore     * $weights['modality']
+            + $locationScore     * $weights['location']
+            + $techScore         * $weights['tech']
+            + $langScore         * $weights['languages'];
 
         return [
-            'eligible'  => true,
-            'score'     => $total,
-            'breakdown' => $scores,
+            'eligible' => true,
+            'score'    => (int) round($total),
+            'breakdown' => [
+                'cycle_fp'     => (int) round($cycleFpScore * $weights['cycle_fp']),
+                'availability' => (int) round($availabilityScore * $weights['availability']),
+                'modality'     => (int) round($modalityScore * $weights['modality']),
+                'location'     => (int) round($locationScore * $weights['location']),
+                'tech'         => (int) round($techScore * $weights['tech']),
+                'languages'    => (int) round($langScore * $weights['languages']),
+                'raw'          => [
+                    'cycle_fp'     => $cycleFpBreakdown,
+                    'availability' => $availabilityScore,
+                    'modality'     => $modalityScore,
+                    'location'     => $locationScore,
+                    'tech'         => $techScore,
+                    'languages'    => $langScore,
+                ],
+            ],
         ];
     }
 
-    /* =====================================================
-     *  CARGA DE DATOS (BD) — pivotes alumno/vacante
-     * ===================================================== */
-
-    protected function loadStudentCompetencies(int $studentId): array
-    {
-        return DB::table('alumno_competencia')
-            ->where('student_id', $studentId)
-            ->pluck('competency_id')
-            ->map(fn ($id) => (int) $id)
-            ->all();
-    }
-
     /**
-     * @return array<int,string> [language_id => nivel ('A2','B1',...)]
+     * Ciclo + tipo de FP.
+     * - 2º DAM cuenta como válido para vacante que pide 1º DAM (sin extra).
+     * - Si familia no coincide, o el alumno está por debajo del curso requerido → no elegible.
      */
-    protected function loadStudentLanguages(int $studentId): array
+    protected function scoreCycleAndFp(Student $student, Vacancy $vacancy): array
     {
-        return DB::table('alumno_idioma')
-            ->where('student_id', $studentId)
-            ->get(['language_id', 'nivel'])
-            ->mapWithKeys(function ($row) {
-                return [(int) $row->language_id => (string) $row->nivel];
-            })
-            ->all();
-    }
+        $studentCycle = $this->parseCycle($student->cycle);
+        $vacCycle     = $this->parseCycle($vacancy->cycle_required);
 
-    /**
-     * @return array<int,array<int,array{competency_id:int, es_obligatoria:bool}>>
-     */
-    protected function loadVacancyCompetencies(Collection $vacancyIds): array
-    {
-        if ($vacancyIds->isEmpty()) {
-            return [];
-        }
+        $cyclePart = 1.0;
+        $eligible  = true;
 
-        return DB::table('vacante_competencia_req')
-            ->whereIn('vacancy_id', $vacancyIds->all())
-            ->get()
-            ->groupBy('vacancy_id')
-            ->map(function (Collection $rows) {
-                return $rows->map(function ($row) {
-                    return [
-                        'competency_id'  => (int) $row->competency_id,
-                        'es_obligatoria' => (bool) $row->es_obligatoria,
-                    ];
-                })->all();
-            })
-            ->all();
-    }
-
-    /**
-     * @return array<int,array<int,array{language_id:int, min_level:?string, required:bool}>>
-     */
-    protected function loadVacancyLanguages(Collection $vacancyIds): array
-    {
-        if ($vacancyIds->isEmpty()) {
-            return [];
-        }
-
-        return DB::table('vacante_idioma_req')
-            ->whereIn('vacancy_id', $vacancyIds->all())
-            ->get()
-            ->groupBy('vacancy_id')
-            ->map(function (Collection $rows) {
-                return $rows->map(function ($row) {
-                    return [
-                        'language_id' => (int) $row->language_id,
-                        'min_level'   => $row->min_level ?? $row->nivel_minimo,
-                        'required'    => (bool) $row->required,
-                    ];
-                })->all();
-            })
-            ->all();
-    }
-
-    /* =====================================================
-     *  BLOQUES DE SCORE (devuelven 0–1)
-     * ===================================================== */
-
-    /**
-     * Competencias técnicas.
-     * - Si falta alguna obligatoria => $eligible = false.
-     * - Cobertura = (# competencias de vacante que tiene el alumno / # totales de vacante).
-     */
-    protected function scoreTech(array $studentCompetencies, array $vacancyCompetencies, bool &$eligible): float
-    {
-        if (empty($vacancyCompetencies)) {
-            return 0.0;
-        }
-
-        $requiredIds = [];
-        $allReqIds   = [];
-
-        foreach ($vacancyCompetencies as $row) {
-            $cid = (int) $row['competency_id'];
-            $allReqIds[] = $cid;
-
-            if (!empty($row['es_obligatoria'])) {
-                $requiredIds[] = $cid;
-            }
-        }
-
-        $studentSet = array_unique($studentCompetencies);
-
-        // Must-have
-        foreach ($requiredIds as $cid) {
-            if (!in_array($cid, $studentSet, true)) {
-                $eligible = false;
-                return 0.0;
-            }
-        }
-
-        $allReqIds = array_unique($allReqIds);
-
-        if (empty($allReqIds)) {
-            return 0.0;
-        }
-
-        $intersect = array_intersect($allReqIds, $studentSet);
-
-        return count($intersect) / count($allReqIds);
-    }
-
-    /**
-     * Ciclo y tipo de FP: si ciclo coincide y la modalidad es aceptada por la vacante,
-     * se lleva el bloque entero; si no, 0.
-     */
-    protected function scoreCycleAndFp(Student $student, Vacancy $vacancy): float
-    {
-        $studentCycle  = $this->normalizeCycle($student->cycle ?? $student->ciclo);
-        $vacancyCycle  = $this->normalizeCycle($vacancy->cycle_required);
-        $studentFpMode = $student->fp_modality;
-
-        if (!$studentCycle || !$vacancyCycle) {
-            return 0.0;
-        }
-
-        if ($studentCycle !== $vacancyCycle) {
-            return 0.0;
-        }
-
-        $acceptsGeneral = property_exists($vacancy, 'accepts_fp_general')
-            ? (bool) $vacancy->accepts_fp_general
-            : true;
-
-        $acceptsDual = property_exists($vacancy, 'accepts_fp_dual')
-            ? (bool) $vacancy->accepts_fp_dual
-            : true;
-
-        $fp = $studentFpMode ? Str::lower($studentFpMode) : null;
-
-        if ($fp === 'general' && !$acceptsGeneral) {
-            return 0.0;
-        }
-
-        if ($fp === 'dual' && !$acceptsDual) {
-            return 0.0;
-        }
-
-        // Si no hay modalidad de FP en el alumno o la vacante acepta ambas, damos el bloque completo.
-        return 1.0;
-    }
-
-    /**
-     * Disponibilidad real (franja mañana/tarde/ambas).
-     */
-    protected function scoreSchedule(Student $student, Vacancy $vacancy): float
-    {
-        $studentSlot = $this->normalizeSlot($student->availability_slot);
-        $vacancySlot = $this->normalizeSlot($vacancy->mode);
-
-        if (!$studentSlot || !$vacancySlot) {
-            return 0.0;
-        }
-
-        if ($studentSlot === 'both') {
-            // Alumno flexible
-            return 1.0;
-        }
-
-        if ($studentSlot === $vacancySlot) {
-            return 1.0;
-        }
-
-        // Si la vacante es "flexible" o "split" y el alumno tiene al menos una franja:
-        if (in_array($vacancySlot, ['flexible', 'split'], true)) {
-            return 0.7;
-        }
-
-        return 0.0;
-    }
-
-    /**
-     * Modalidad de trabajo (presencial/remoto/híbrido).
-     */
-    protected function scoreMode(Student $student, Vacancy $vacancy): float
-    {
-        $studentMode = $this->normalizeModality($student->work_modality);
-        $vacancyMode = $this->normalizeModality($vacancy->modalidad);
-
-        if (!$studentMode || !$vacancyMode) {
-            return 0.0;
-        }
-
-        if ($studentMode === $vacancyMode) {
-            return 1.0;
-        }
-
-        // Híbrida vs presencial/remoto: algo de encaje
-        if ($vacancyMode === 'hybrid' && in_array($studentMode, ['onsite', 'remote'], true)) {
-            return 0.7;
-        }
-
-        return 0.0;
-    }
-
-    /**
-     * Ubicación (localidad alumno vs municipio vacante).
-     * Si coincide ciudad → 100% de este bloque.
-     * Si no coincide pero el alumno se puede desplazar o la vacante es remota → 50%.
-     */
-    protected function scoreLocation(Student $student, Vacancy $vacancy): float
-    {
-        $studentCity = $this->normalizeCity($student->city);
-        $vacancyCity = $this->normalizeCity($vacancy->city);
-
-        if (!$studentCity || !$vacancyCity) {
-            return 0.0;
-        }
-
-        if ($studentCity === $vacancyCity) {
-            return 1.0;
-        }
-
-        $relocate    = (bool) $student->relocate;
-        $vacancyMode = $this->normalizeModality($vacancy->modalidad);
-
-        if ($relocate || $vacancyMode === 'remote') {
-            return 0.5;
-        }
-
-        return 0.0;
-    }
-
-    /**
-     * Comprueba que los idiomas marcados como required se cumplen.
-     */
-    protected function checkRequiredLanguages(array $studentLangs, array $vacancyLangs): bool
-    {
-        foreach ($vacancyLangs as $row) {
-            if (empty($row['required'])) {
-                continue;
+        if ($vacCycle) {
+            // La vacante pide algo concreto
+            if (! $studentCycle) {
+                // Alumno sin ciclo rellenado → no entra en esta vacante
+                return [0.0, ['cycle' => 0.0, 'fp' => 0.0], false];
             }
 
-            $langId    = (int) $row['language_id'];
-            $reqLevel  = $this->mapLanguageLevel($row['min_level'] ?? null);
-            $studentLv = isset($studentLangs[$langId])
-                ? $this->mapLanguageLevel($studentLangs[$langId])
-                : null;
-
-            if (!$reqLevel) {
-                // Si no hay nivel definido, no lo tratamos como filtro duro.
-                continue;
+            // Familia distinta (DAM vs DAW) → fuera
+            if ($studentCycle['family'] !== $vacCycle['family']) {
+                return [0.0, ['cycle' => 0.0, 'fp' => 0.0], false];
             }
 
-            if (!$studentLv || $studentLv < $reqLevel) {
-                return false;
+            // Curso por debajo → fuera (1º para vacante que pide 2º)
+            if ($studentCycle['year'] < $vacCycle['year']) {
+                return [0.0, ['cycle' => 0.0, 'fp' => 0.0], false];
             }
+
+            // 1º==1º, 2º==2º, 2º para vacante 1º → OK, sin extra
+            $cyclePart = 1.0;
         }
 
-        return true;
-    }
+        // Tipo de FP
+        $fpPart = 1.0;
+        $studentFp = strtolower((string) $student->fp_modality);
+        $acceptsGeneral = (bool) $vacancy->accepts_fp_general;
+        $acceptsDual    = (bool) $vacancy->accepts_fp_dual;
 
-    /**
-     * Idiomas: media de "ratios" por idioma requerido.
-     * - >= nivel mínimo → 1.0
-     * - un escalón por debajo → 0.5
-     * - resto → 0
-     */
-    protected function scoreLanguages(array $studentLangs, array $vacancyLangs): float
-    {
-        if (empty($vacancyLangs)) {
-            return 0.0;
-        }
-
-        $ratios = [];
-
-        foreach ($vacancyLangs as $row) {
-            $langId = (int) $row['language_id'];
-            $req    = $this->mapLanguageLevel($row['min_level'] ?? null);
-
-            if (!$req) {
-                continue;
-            }
-
-            $studentLevel = isset($studentLangs[$langId])
-                ? $this->mapLanguageLevel($studentLangs[$langId])
-                : null;
-
-            if (!$studentLevel) {
-                $ratios[] = 0.0;
-                continue;
-            }
-
-            if ($studentLevel >= $req) {
-                $ratios[] = 1.0;
-            } elseif ($studentLevel + 1 === $req) {
-                $ratios[] = 0.5;
+        if ($studentFp) {
+            if ($studentFp === 'general') {
+                if (! $acceptsGeneral) {
+                    return [0.0, ['cycle' => $cyclePart, 'fp' => 0.0], false];
+                }
+                $fpPart = 1.0;
+            } elseif ($studentFp === 'dual') {
+                if (! $acceptsDual) {
+                    return [0.0, ['cycle' => $cyclePart, 'fp' => 0.0], false];
+                }
+                $fpPart = 1.0;
             } else {
-                $ratios[] = 0.0;
+                $fpPart = 0.0;
             }
+        } else {
+            // No ha rellenado tipo de FP → no lo hacemos no elegible, pero no suma por este subapartado
+            $fpPart = 0.0;
         }
 
-        if (empty($ratios)) {
-            return 0.0;
-        }
+        // 60% ciclo, 40% tipo FP dentro del bloque de 25 puntos
+        $score = 0.6 * $cyclePart + 0.4 * $fpPart;
 
-        return array_sum($ratios) / count($ratios);
+        return [$score, ['cycle' => $cyclePart, 'fp' => $fpPart], $eligible];
     }
 
-    /* =====================================================
-     *  HELPERS DE NORMALIZACIÓN
-     * ===================================================== */
-
-    protected function normalizeCycle(?string $cycle): ?string
+    /**
+     * Normaliza ciclos tipo "1 DAM", "2DAW" → ['year' => 1|2, 'family' => 'DAM'|'DAW']
+     */
+    protected function parseCycle(?string $cycle): ?array
     {
-        if (!$cycle) {
+        if (! $cycle) {
             return null;
         }
 
-        $c = Str::upper(trim($cycle));
-        $c = preg_replace('/\s+/', ' ', $c);
+        $cycle = strtoupper(str_replace(['º', 'ª'], '', $cycle));
+        $cycle = preg_replace('/\s+/', '', $cycle); // "2 DAW" -> "2DAW"
 
-        return $c ?: null;
+        if (! preg_match('/^([12])?(DAM|DAW)$/', $cycle, $m)) {
+            return null;
+        }
+
+        $year   = isset($m[1]) ? (int) $m[1] : null;
+        $family = $m[2];
+
+        // Si solo ponen "DAM" / "DAW", asumimos 2º para que no excluya vacantes de 1º
+        if ($year === null) {
+            $year = 2;
+        }
+
+        return ['year' => $year, 'family' => $family];
+    }
+
+    /* ===================== DISPONIBILIDAD ===================== */
+
+    protected function scoreAvailability(Student $student, Vacancy $vacancy): float
+    {
+        $studentSlot = $this->normalizeSlot($student->availability_slot);
+        $vacSlots    = $this->normalizeVacancySlots($vacancy->horarios_disponibles);
+
+        if (! $studentSlot || empty($vacSlots)) {
+            return 0.0;
+        }
+
+        if ($studentSlot === 'AMBAS') {
+            // Alumno flexible → si la vacante tiene mañana o tarde, cuenta completo
+            return 1.0;
+        }
+
+        return in_array($studentSlot, $vacSlots, true) ? 1.0 : 0.0;
     }
 
     protected function normalizeSlot(?string $slot): ?string
     {
-        if (!$slot) {
-            return null;
+        if (! $slot) return null;
+
+        $v = mb_strtolower(trim($slot));
+
+        if (str_contains($v, 'mañana') || str_starts_with($v, 'm')) {
+            return 'MANANA';
         }
-
-        $s = Str::ascii(Str::lower(trim($slot))); // "mañana" -> "manana"
-
-        return match ($s) {
-            'manana', 'morning'         => 'morning',
-            'tarde', 'afternoon'        => 'afternoon',
-            'ambas', 'ambos', 'both'    => 'both',
-            'partido', 'split'          => 'split',
-            'flexible'                  => 'flexible',
-            default                     => null,
-        };
-    }
-
-    protected function normalizeModality(?string $value): ?string
-    {
-        if (!$value) {
-            return null;
+        if (str_contains($v, 'tarde') || str_starts_with($v, 't')) {
+            return 'TARDE';
         }
-
-        $v = Str::ascii(Str::lower(trim($value)));
-
-        if (in_array($v, ['presencial', 'onsite', 'oficina'], true)) {
-            return 'onsite';
-        }
-
-        if (in_array($v, ['remota', 'remote'], true)) {
-            return 'remote';
-        }
-
-        if (in_array($v, ['hibrida', 'híbrida', 'hybrid', 'mixta'], true)) {
-            return 'hybrid';
+        if (str_contains($v, 'amb')) {
+            return 'AMBAS';
         }
 
         return null;
     }
 
-    protected function normalizeCity(?string $city): ?string
+    protected function normalizeVacancySlots($value): array
     {
-        if (!$city) {
-            return null;
+        $list = $this->normalizeList($value);
+        $out  = [];
+
+        foreach ($list as $item) {
+            $slot = $this->normalizeSlot($item);
+            if ($slot) {
+                $out[$slot] = true;
+            }
         }
 
-        $c = Str::ascii(Str::lower(trim($city)));
+        // Por si la vacante guarda un string simple en vez de json
+        if (empty($out) && is_string($value)) {
+            $slot = $this->normalizeSlot($value);
+            if ($slot) {
+                $out[$slot] = true;
+            }
+        }
 
-        return $c ?: null;
+        return array_keys($out);
     }
 
-    protected function mapLanguageLevel(?string $level): ?int
+    /* ===================== MODALIDAD (multi alumno) ===================== */
+
+    protected function scoreModalities(Student $student, Vacancy $vacancy): float
     {
-        if (!$level) {
-            return null;
+        $studentMods = $this->studentModalities($student);
+        $vacMod      = $this->normalizeModality($vacancy->modalidad ?? $vacancy->mode);
+
+        if (! $vacMod || empty($studentMods)) {
+            return 0.0;
         }
 
-        return match (Str::upper(trim($level))) {
-            'A1' => 1,
-            'A2' => 2,
-            'B1' => 3,
-            'B2' => 4,
-            'C1' => 5,
-            'C2' => 6,
-            default => null,
-        };
+        return in_array($vacMod, $studentMods, true) ? 1.0 : 0.0;
+    }
+
+    protected function studentModalities(Student $student): array
+    {
+        $raw = $student->work_modalities ?? $student->work_modality;
+
+        if (is_string($raw)) {
+            $parts = explode(',', $raw);
+        } elseif (is_array($raw)) {
+            $parts = $raw;
+        } else {
+            $parts = [];
+        }
+
+        $set = [];
+        foreach ($parts as $p) {
+            $m = $this->normalizeModality($p);
+            if ($m) {
+                $set[$m] = true;
+            }
+        }
+
+        return array_keys($set);
+    }
+
+    protected function normalizeModality(?string $value): ?string
+    {
+        if (! $value) return null;
+
+        $v = strtoupper(trim($value));
+
+        if (str_starts_with($v, 'PRE')) return 'PRESENCIAL';
+        if (str_starts_with($v, 'HIB') || str_starts_with($v, 'HÍB')) return 'HIBRIDA';
+        if (str_starts_with($v, 'REM') || str_starts_with($v, 'TEL')) return 'REMOTA';
+
+        return null;
+    }
+
+    /* ===================== UBICACIÓN ===================== */
+
+    protected function scoreLocation(Student $student, Vacancy $vacancy): float
+    {
+        // Ahora mismo en students solo tienes city (no provincia del alumno),
+        // así que uso: 1.0 si coincide city, 0.0 si no.
+        $cityStudent = $this->normString($student->city);
+        $cityVac     = $this->normString($vacancy->city);
+
+        if (! $cityStudent || ! $cityVac) {
+            return 0.0;
+        }
+
+        return $cityStudent === $cityVac ? 1.0 : 0.0;
+
+        /*
+         * Si más adelante añades provincia/municipio al alumno, aquí
+         * podemos hacer:
+         * - 1.0 si ciudad + provincia coinciden
+         * - 0.5 si solo coincide ciudad
+         * - 0.0 si nada coincide
+         */
+    }
+
+    protected function normString(?string $value): ?string
+    {
+        if (! $value) return null;
+        $value = trim(mb_strtolower($value));
+        return $value !== '' ? $value : null;
+    }
+
+    /* ===================== TECNOLOGÍAS ===================== */
+
+    protected function scoreTechnologies(Student $student, Vacancy $vacancy): float
+    {
+        $studentTechs = $this->normalizeList($student->tech_competencies);
+        $vacTechs     = $this->normalizeList($vacancy->tech_stack ?? $vacancy->competencies);
+
+        if (empty($vacTechs) || empty($studentTechs)) {
+            return 0.0;
+        }
+
+        $matched = array_intersect($vacTechs, $studentTechs);
+
+        // Cobertura de lo que pide la vacante:
+        // si pide [JavaScript, PHP] y el alumno tiene ambos, 2/2 = 1.0 (máximo)
+        // si solo tiene uno, 1/2 = 0.5, etc.
+        $required = count($vacTechs);
+
+        if ($required === 0) {
+            return 0.0;
+        }
+
+        return count($matched) / $required;
+    }
+
+    /**
+     * Normaliza una lista (json, array, string con comas…) a array de slugs en minúsculas.
+     */
+    protected function normalizeList($value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value = $decoded;
+            } else {
+                $value = explode(',', $value);
+            }
+        }
+
+        if ($value instanceof \Illuminate\Support\Collection) {
+            $value = $value->all();
+        }
+
+        $out = [];
+
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $name = $item['name'] ?? $item['slug'] ?? $item['label'] ?? $item['value'] ?? null;
+            } else {
+                $name = (string) $item;
+            }
+
+            $name = trim(mb_strtolower($name));
+            if ($name !== '') {
+                $out[$name] = true;
+            }
+        }
+
+        return array_keys($out);
+    }
+
+    /* ===================== IDIOMAS ===================== */
+
+    protected function scoreLanguages(Student $student, Vacancy $vacancy): float
+    {
+        $studentLangs = $this->normalizeLanguageList($student->languages);
+        $vacLangs     = $this->normalizeLanguageList($vacancy->idiomas);
+
+        if (empty($vacLangs) || empty($studentLangs)) {
+            return 0.0;
+        }
+
+        $required = count($vacLangs);
+        $matched  = 0.0;
+
+        foreach ($vacLangs as $code => $reqLevel) {
+            $stuLevel = $studentLangs[$code] ?? null;
+            if (! $stuLevel) {
+                continue;
+            }
+
+            $cmp = $this->compareLangLevel($stuLevel, $reqLevel);
+
+            if ($cmp >= 0) {
+                // mismo nivel o superior → 1 punto
+                $matched += 1.0;
+            } elseif ($cmp === -1) {
+                // un poquito por debajo → 0.3 en vez de 0
+                $matched += 0.3;
+            }
+        }
+
+        if ($required === 0) {
+            return 0.0;
+        }
+
+        $ratio = $matched / $required;
+
+        return max(0.0, min(1.0, $ratio));
+    }
+
+    /**
+     * Devuelve ['en' => 'B1', 'es' => 'C1', ...] a partir de json/array/string.
+     */
+    protected function normalizeLanguageList($value): array
+    {
+        if (! $value) {
+            return [];
+        }
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            if (json_last_error() === JSON_ERROR_NONE) {
+                $value = $decoded;
+            } else {
+                // Formato "EN:B1,ES:C1"
+                $items = explode(',', $value);
+                $out = [];
+                foreach ($items as $item) {
+                    $parts = explode(':', $item);
+                    if (count($parts) === 2) {
+                        $code  = strtolower(trim($parts[0]));
+                        $level = strtoupper(trim($parts[1]));
+                        if ($code) {
+                            $out[$code] = $level ?: 'A1';
+                        }
+                    }
+                }
+                return $out;
+            }
+        }
+
+        if ($value instanceof \Illuminate\Support\Collection) {
+            $value = $value->all();
+        }
+
+        $out = [];
+
+        foreach ($value as $item) {
+            if (is_array($item)) {
+                $code  = strtolower(trim($item['code'] ?? $item['slug'] ?? $item['idioma'] ?? ''));
+                $level = strtoupper(trim($item['level'] ?? $item['nivel'] ?? ''));
+            } else {
+                // Fallback: "EN B1"
+                $parts = preg_split('/\s+/', (string) $item);
+                $code  = strtolower($parts[0] ?? '');
+                $level = strtoupper($parts[1] ?? '');
+            }
+
+            if ($code === '') {
+                continue;
+            }
+            if ($level === '') {
+                $level = 'A1';
+            }
+
+            $out[$code] = $level;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Compara niveles tipo A1 < A2 < B1 < B2 < C1 < C2.
+     * Devuelve:
+     *  1  si alumno >= requerido
+     *  0  si igual
+     * -1  si alumno < requerido
+     */
+    protected function compareLangLevel(string $student, string $required): int
+    {
+        $order = ['A1' => 1, 'A2' => 2, 'B1' => 3, 'B2' => 4, 'C1' => 5, 'C2' => 6];
+
+        $s = $order[$student]  ?? 0;
+        $r = $order[$required] ?? 0;
+
+        if ($s === $r) return 0;
+
+        return $s > $r ? 1 : -1;
     }
 }

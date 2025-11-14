@@ -5,8 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Inertia\Inertia;
 use Illuminate\Support\Facades\Log;
+use Inertia\Inertia;
 
 class StudentController extends Controller
 {
@@ -15,8 +15,8 @@ class StudentController extends Controller
         $student = Student::firstOrCreate(['user_id' => $request->user()->id]);
 
         $student->load([
-            'educations'  => fn($q) => $q->orderBy('start_date', 'desc'),
-            'experiences' => fn($q) => $q->orderBy('start_date', 'desc'),
+            'educations'  => fn ($q) => $q->orderBy('start_date', 'desc'),
+            'experiences' => fn ($q) => $q->orderBy('start_date', 'desc'),
         ]);
 
         return Inertia::render('Students/Edit', [
@@ -50,14 +50,22 @@ class StudentController extends Controller
             'fp_modality'         => ['nullable', 'in:dual,general'],
 
             // disponibilidad
-            'availability_slot'   => ['nullable', 'in:morning,afternoon,both'],
+            // IMPORTANTE: franja en castellano: mañana / tarde / ambas
+            'availability_slot'   => ['nullable', 'in:mañana,tarde,ambas'],
             'commitments'         => ['nullable', 'array'],
             'commitments.*'       => ['string'],
             'relocate'            => ['nullable', 'boolean'],
             'relocate_cities'     => ['nullable', 'array'],
             'relocate_cities.*'   => ['string'],
             'transport_own'       => ['nullable', 'boolean'],
+
+            // modalidad de trabajo:
+            // - work_modality: principal (string, para compatibilidad y BDD actual)
+            // - work_modalities: array opcional (para multiselección en el front)
             'work_modality'       => ['nullable', 'in:presencial,remota,hibrida'],
+            'work_modalities'     => ['nullable', 'array'],
+            'work_modalities.*'   => ['in:presencial,remota,hibrida'],
+
             'remote_days'         => ['nullable', 'integer', 'min:0', 'max:7'],
             'days_per_week'       => ['nullable', 'integer', 'min:1', 'max:7'],
             'available_from'      => ['nullable', 'date'],
@@ -97,40 +105,64 @@ class StudentController extends Controller
             'other_certs.*'       => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:8192'],
         ]);
 
+        // Normalizar modalidades si viene el array (multiselección)
+        if (array_key_exists('work_modalities', $data) && is_array($data['work_modalities'])) {
+            // Limpiamos duplicados / vacíos
+            $mods = array_values(array_unique(array_filter($data['work_modalities'])));
+            $data['work_modalities'] = $mods;
+
+            // Para compatibilidad con el campo simple en BDD:
+            // dejamos la primera como "principal"
+            if (!empty($mods)) {
+                $data['work_modality'] = $mods[0];
+            }
+        }
+
         // Subida de ficheros (si vienen)
         if ($request->hasFile('avatar')) {
-            if ($student->avatar_path) Storage::disk('public')->delete($student->avatar_path);
+            if ($student->avatar_path) {
+                Storage::disk('public')->delete($student->avatar_path);
+            }
             $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
         }
+
         if ($request->hasFile('cv')) {
-            if ($student->cv_path) Storage::disk('public')->delete($student->cv_path);
+            if ($student->cv_path) {
+                Storage::disk('public')->delete($student->cv_path);
+            }
             $data['cv_path'] = $request->file('cv')->store('cv', 'public');
         }
+
         if ($request->hasFile('cover_letter')) {
-            if ($student->cover_letter_path) Storage::disk('public')->delete($student->cover_letter_path);
+            if ($student->cover_letter_path) {
+                Storage::disk('public')->delete($student->cover_letter_path);
+            }
             $data['cover_letter_path'] = $request->file('cover_letter')->store('cover_letters', 'public');
         }
+
         if ($request->hasFile('other_certs')) {
             $paths = [];
             foreach ($request->file('other_certs') as $file) {
                 $paths[] = $file->store('certs', 'public');
             }
-            $data['other_certs_paths'] = $paths;
+            // OJO: nombre de columna en BDD = other_cert_paths
+            $data['other_cert_paths'] = $paths;
         }
 
         // Guarda todo y lanza excepción si algo falla
         $student->fill($data);
         $student->saveOrFail();
 
-        return redirect()->route('students.edit.me')->with('success', 'Perfil guardado.');
+        return redirect()
+            ->route('students.edit.me')
+            ->with('success', 'Perfil guardado.');
     }
-
 
     public function publicShow(Student $student)
     {
         $student->load([
-            'educations'  => fn($q) => $q->orderBy('start_date', 'desc'),
-            'experiences' => fn($q) => $q->orderBy('start_date', 'desc'),
+            'educations'  => fn ($q) => $q->orderBy('start_date', 'desc'),
+            'experiences' => fn ($q) => $q->orderBy('start_date', 'desc'),
         ]);
 
         return Inertia::render('Students/PublicShow', [
@@ -139,10 +171,12 @@ class StudentController extends Controller
     }
 
     // ===== Resources =====
+
     protected function toResource(Student $s): array
     {
         return [
             'id'                  => $s->id,
+
             // personales
             'user_name'           => optional($s->user)->name,
             'dni'                 => $s->dni,
@@ -153,12 +187,14 @@ class StudentController extends Controller
             'city'                => $s->city,
             'has_driver_license'  => $s->has_driver_license,
             'has_vehicle'         => $s->has_vehicle,
+
             // académicos
             'cycle'               => $s->cycle,
             'center'              => $s->center,
             'year_start'          => $s->year_start,
             'year_end'            => $s->year_end,
             'fp_modality'         => $s->fp_modality,
+
             // disponibilidad
             'availability_slot'   => $s->availability_slot,
             'commitments'         => $s->commitments ?? [],
@@ -166,9 +202,11 @@ class StudentController extends Controller
             'relocate_cities'     => $s->relocate_cities ?? [],
             'transport_own'       => $s->transport_own,
             'work_modality'       => $s->work_modality,
+            'work_modalities'     => $s->work_modalities ?? [], // nuevo
             'remote_days'         => $s->remote_days,
             'days_per_week'       => $s->days_per_week,
             'available_from'      => optional($s->available_from)?->format('Y-m-d'),
+
             // intereses
             'sectors'                 => $s->sectors ?? [],
             'preferred_company_type'  => $s->preferred_company_type,
@@ -177,33 +215,38 @@ class StudentController extends Controller
             'soft_skills'             => $s->soft_skills ?? [],
             'languages'               => $s->languages ?? [],
             'certifications'          => $s->certifications ?? [],
+
             // extra
             'hobbies'             => $s->hobbies,
             'clubs'               => $s->clubs,
             'align_activities'    => $s->align_activities,
             'entrepreneurship'    => $s->entrepreneurship,
+
             // links
             'link_linkedin'       => $s->link_linkedin,
             'link_portfolio'      => $s->link_portfolio,
             'link_github'         => $s->link_github,
             'link_video'          => $s->link_video,
+
             // ficheros
             'avatar_url'          => $s->avatar_url,
+
             // relaciones
-            'educations' => $s->educations->map(fn($e) => [
+            'educations' => $s->educations->map(fn ($e) => [
                 'id'         => $e->id,
                 'title'      => $e->title,
                 'center'     => $e->center,
                 'start_date' => optional($e->start_date)?->format('Y-m-d'),
                 'end_date'   => optional($e->end_date)?->format('Y-m-d'),
             ])->values(),
-            'experiences' => $s->experiences->map(fn($x) => [
-                'id'           => $x->id,
-                'company'      => $x->company,
-                'position'     => $x->position,
-                'start_date'   => optional($x->start_date)?->format('Y-m-d'),
-                'end_date'     => optional($x->end_date)?->format('Y-m-d'),
-                'functions'    => $x->functions,
+
+            'experiences' => $s->experiences->map(fn ($x) => [
+                'id'            => $x->id,
+                'company'       => $x->company,
+                'position'      => $x->position,
+                'start_date'    => optional($x->start_date)?->format('Y-m-d'),
+                'end_date'      => optional($x->end_date)?->format('Y-m-d'),
+                'functions'     => $x->functions,
                 'is_non_formal' => $x->is_non_formal,
             ])->values(),
         ];
@@ -211,7 +254,7 @@ class StudentController extends Controller
 
     protected function toPublicResource(Student $s): array
     {
-        // La vista pública oculta vacíos; devolvemos lo mismo
+        // De momento devolvemos lo mismo; la vista pública ya decide qué mostrar/ocultar
         return $this->toResource($s);
     }
 }

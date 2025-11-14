@@ -33,6 +33,9 @@ class Student extends Model
         'languages'         => 'array',
         'certifications'    => 'array',
         'other_certs_paths' => 'array',
+        'work_modalities' => 'array',
+        'tech_competencies' => 'array',
+        'languages' => 'array',
     ];
 
     protected $appends = ['avatar_url'];
@@ -59,13 +62,13 @@ class Student extends Model
 
 
     public function languages()
-{
-    return $this->belongsToMany(\App\Models\Language::class, 'alumno_idioma', 'student_id', 'language_id')
-        ->withPivot(['level','nivel']);
-}
+    {
+        return $this->belongsToMany(\App\Models\Language::class, 'alumno_idioma', 'student_id', 'language_id')
+            ->withPivot(['level', 'nivel']);
+    }
 
-public function competencies()
-{
-    return $this->belongsToMany(\App\Models\Competency::class, 'alumno_competencia', 'student_id', 'competency_id');
-}
+    public function competencies()
+    {
+        return $this->belongsToMany(\App\Models\Competency::class, 'alumno_competencia', 'student_id', 'competency_id');
+    }
 }
