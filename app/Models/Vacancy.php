@@ -32,6 +32,9 @@ class Vacancy extends Model
         'tech_stack'    => 'array',
         'soft_skills'   => 'array',
         'published_at'  => 'datetime',
+        'accepts_fp_general' => 'boolean',
+        'accepts_fp_dual'    => 'boolean',
+
     ];
 
     public function company(): BelongsTo
@@ -41,10 +44,10 @@ class Vacancy extends Model
 
     // Idiomas requeridos (pivot con meta)
     public function requiredLanguages()
-{
-    return $this->belongsToMany(\App\Models\Language::class, 'vacante_idioma_req', 'vacancy_id', 'language_id')
-        ->withPivot('min_level'); 
-}
+    {
+        return $this->belongsToMany(\App\Models\Language::class, 'vacante_idioma_req', 'vacancy_id', 'language_id')
+            ->withPivot('min_level');
+    }
 
 
     // Competencias técnicas requeridas (si ya existe pivot vacante_competencia_req)

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\VacancyController;
+use App\Http\Controllers\VacancyStudentController;
 use App\Http\Controllers\ApplicationController;
 use App\Http\Controllers\MatchingController;
 use App\Http\Controllers\StudentController;
@@ -18,7 +19,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // ---- VACANTES (GENERAL) ----
     // 1) Índice general
-    Route::get('/vacantes', [VacancyController::class, 'index'])->name('vacancies.index');
+    //
+    // AHORA:
+    // - Para alumnos: VacancyStudentController@index -> usa CompatibilityService y devuelve vacantes ordenadas por score (>=50%)
+    // - Para el resto de roles, dentro del controller puedes delegar a VacancyController@index si quieres.
+    Route::get('/vacantes', [VacancyStudentController::class, 'index'])->name('vacancies.index');
 
     // 2) Rutas SOLO empresa (colocadas ANTES de /vacantes/{vacancy})
     Route::middleware(['role:company'])->group(function () {
