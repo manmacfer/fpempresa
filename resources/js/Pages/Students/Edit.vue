@@ -5,20 +5,9 @@ import { ref, computed } from 'vue'
 
 const props = defineProps({
   student: { type: Object, required: true },
+  allCompetencies: { type: Array, required: true },
+  allLanguages: { type: Array, required: true },
 })
-
-// ===== Helpers para inicializar arrays =====
-const cloneArray = (val) => Array.isArray(val) ? [...val] : []
-
-// Modalidades de trabajo (multi)
-const initialWorkModalities = (() => {
-  const raw = props.student.work_modalities ?? props.student.work_modality ?? ''
-  if (Array.isArray(raw)) return [...raw]
-  if (typeof raw === 'string' && raw.trim() !== '') {
-    return raw.split(',').map(v => v.trim()).filter(Boolean)
-  }
-  return []
-})()
 
 // ===== Form principal (perfil) =====
 const form = useForm({
@@ -47,24 +36,38 @@ const form = useForm({
 
   // disponibilidad
   availability_slot: props.student.availability_slot ?? '',
-  commitments: cloneArray(props.student.commitments),
+  commitments: Array.isArray(props.student.commitments) ? [...props.student.commitments] : [],
   relocate: props.student.relocate ?? null,
-  relocate_cities: cloneArray(props.student.relocate_cities),
+  relocate_cities: Array.isArray(props.student.relocate_cities) ? [...props.student.relocate_cities] : [],
   transport_own: props.student.transport_own ?? null,
   work_modality: props.student.work_modality ?? '',
-  work_modalities: initialWorkModalities,
+  work_modalities: Array.isArray(props.student.work_modalities)
+    ? [...props.student.work_modalities]
+    : (props.student.work_modality ? [props.student.work_modality] : []),
   remote_days: props.student.remote_days ?? null,
   days_per_week: props.student.days_per_week ?? null,
   available_from: props.student.available_from ?? '',
 
-  // intereses / perfil
-  sectors: cloneArray(props.student.sectors),
+  // intereses / perfil (decorativos / CV)
+  sectors: Array.isArray(props.student.sectors) ? [...props.student.sectors] : [],
   preferred_company_type: props.student.preferred_company_type ?? '',
   non_formal_experience: props.student.non_formal_experience ?? '',
-  tech_competencies: cloneArray(props.student.tech_competencies),
-  soft_skills: cloneArray(props.student.soft_skills),
-  languages: cloneArray(props.student.languages),
-  certifications: cloneArray(props.student.certifications),
+  tech_competencies: Array.isArray(props.student.tech_competencies) ? [...props.student.tech_competencies] : [],
+  soft_skills: Array.isArray(props.student.soft_skills) ? [...props.student.soft_skills] : [],
+  certifications: Array.isArray(props.student.certifications) ? [...props.student.certifications] : [],
+
+  // COMPETENCIAS para compatibilidad (IDs de competencies)
+  competency_ids: Array.isArray(props.student.competency_ids)
+    ? [...props.student.competency_ids]
+    : [],
+
+  // IDIOMAS para compatibilidad (language_id + level)
+  language_items: Array.isArray(props.student.language_items)
+    ? props.student.language_items.map(l => ({
+        language_id: l.language_id,
+        level: l.level ?? '',
+      }))
+    : [],
 
   // extra
   hobbies: props.student.hobbies ?? '',
@@ -85,53 +88,67 @@ const form = useForm({
   newTech: '',
   newSoft: '',
   newCert: '',
-  newLangName: '',
+  newLangLanguageId: '',
   newLangLevel: '',
 })
 
 const previewUrl = ref(props.student.avatar_url ?? null)
 
 // Helpers comunes
-function emptyToNull(v) {
+function emptyToNull (v) {
   if (v === undefined || v === null) return null
   if (typeof v === 'string' && v.trim() === '') return null
   return v
 }
-function numOrNull(v) {
+function numOrNull (v) {
   if (v === '' || v === null || v === undefined) return null
   const n = Number(v)
   return Number.isFinite(n) ? n : null
 }
-function boolOrNull(v) {
+function boolOrNull (v) {
   if (v === true) return true
   if (v === false) return false
   return null
 }
 
-function addItem(field, valueField = null) {
+function addItem (field, valueField = null) {
   const val = (valueField ? form[valueField] : form[field])?.toString().trim()
   if (!val) return
   form[field].push(val)
   if (valueField) form[valueField] = ''
   else form[field] = ''
 }
-function removeItem(field, i) {
+function removeItem (field, i) {
   form[field].splice(i, 1)
 }
 
-function addLanguage() {
-  const n = form.newLangName?.toString().trim()
-  const l = form.newLangLevel?.toString().trim()
-  if (!n) return
-  form.languages.push({ name: n, level: l })
-  form.newLangName = ''
+// Idiomas estructurados (para compatibilidad)
+function addLanguageItem () {
+  const langId = form.newLangLanguageId
+  const level = form.newLangLevel?.toString().trim() || ''
+
+  if (!langId) return
+
+  // Evitar duplicados
+  if (form.language_items.some(i => String(i.language_id) === String(langId))) {
+    form.newLangLanguageId = ''
+    form.newLangLevel = ''
+    return
+  }
+
+  form.language_items.push({
+    language_id: langId,
+    level,
+  })
+
+  form.newLangLanguageId = ''
   form.newLangLevel = ''
 }
-function removeLanguage(i) {
-  form.languages.splice(i, 1)
+function removeLanguageItem (i) {
+  form.language_items.splice(i, 1)
 }
 
-function onPickAvatar(e) {
+function onPickAvatar (e) {
   const f = e.target.files?.[0]
   form.avatar = f || null
   if (f) {
@@ -140,16 +157,17 @@ function onPickAvatar(e) {
     r.readAsDataURL(f)
   }
 }
-function onPickOtherCerts(e) {
+function onPickOtherCerts (e) {
   form.other_certs = Array.from(e.target.files || [])
 }
 
-// Ahora híbrida se detecta por la multi-selección
+// Híbrida si está marcada en las modalidades (multi) o en la simple
 const isHybrid = computed(() =>
-  Array.isArray(form.work_modalities) && form.work_modalities.includes('hibrida')
+  (Array.isArray(form.work_modalities) && form.work_modalities.includes('hibrida')) ||
+  form.work_modality === 'hibrida',
 )
 
-function submit() {
+function submit () {
   form
     .transform(d => ({
       // files
@@ -182,14 +200,12 @@ function submit() {
       relocate_cities: d.relocate_cities,
       transport_own: boolOrNull(d.transport_own),
 
-      // multi-modalidad para compatibilidad
       work_modalities: Array.isArray(d.work_modalities) ? d.work_modalities : [],
-      // modalidad “principal” (por si algo antiguo la usa)
-      work_modality:
+      work_modality: emptyToNull(
         Array.isArray(d.work_modalities) && d.work_modalities.length
           ? d.work_modalities[0]
-          : emptyToNull(d.work_modality),
-
+          : d.work_modality,
+      ),
       remote_days: isHybrid.value ? numOrNull(d.remote_days) : null,
       days_per_week: numOrNull(d.days_per_week),
       available_from: emptyToNull(d.available_from),
@@ -200,8 +216,16 @@ function submit() {
       non_formal_experience: emptyToNull(d.non_formal_experience),
       tech_competencies: d.tech_competencies,
       soft_skills: d.soft_skills,
-      languages: d.languages,
       certifications: d.certifications,
+
+      // compatibilidad
+      competency_ids: d.competency_ids,
+      language_items: (d.language_items || [])
+        .map(item => ({
+          language_id: item.language_id ? Number(item.language_id) : null,
+          level: emptyToNull(item.level),
+        }))
+        .filter(x => x.language_id),
 
       // extra
       hobbies: emptyToNull(d.hobbies),
@@ -223,13 +247,13 @@ const showEduModal = ref(false)
 const editingEdu = ref(null) // null => crear, objeto => editar
 const eduForm = useForm({ title: '', center: '', start_date: '', end_date: '' })
 
-function openEduCreate() {
+function openEduCreate () {
   editingEdu.value = null
   eduForm.reset()
   eduForm.clearErrors()
   showEduModal.value = true
 }
-function openEduEdit(e) {
+function openEduEdit (e) {
   editingEdu.value = e
   eduForm.reset()
   eduForm.clearErrors()
@@ -239,12 +263,12 @@ function openEduEdit(e) {
   eduForm.end_date = e.end_date || ''
   showEduModal.value = true
 }
-function closeEdu() {
+function closeEdu () {
   showEduModal.value = false
   editingEdu.value = null
 }
 
-function saveEducation() {
+function saveEducation () {
   if (editingEdu.value) {
     eduForm.patch(route('students.educations.update', editingEdu.value.id), {
       preserveScroll: true,
@@ -257,7 +281,7 @@ function saveEducation() {
     })
   }
 }
-function deleteEducation(e) {
+function deleteEducation (e) {
   if (!confirm('¿Eliminar esta formación?')) return
   router.delete(route('students.educations.destroy', e.id), { preserveScroll: true })
 }
@@ -267,14 +291,14 @@ const showExpModal = ref(false)
 const editingExp = ref(null)
 const expForm = useForm({ company: '', position: '', start_date: '', end_date: '', functions: '', is_non_formal: false })
 
-function openExpCreate() {
+function openExpCreate () {
   editingExp.value = null
   expForm.reset()
   expForm.clearErrors()
   expForm.is_non_formal = false
   showExpModal.value = true
 }
-function openExpEdit(x) {
+function openExpEdit (x) {
   editingExp.value = x
   expForm.reset()
   expForm.clearErrors()
@@ -286,12 +310,12 @@ function openExpEdit(x) {
   expForm.is_non_formal = !!x.is_non_formal
   showExpModal.value = true
 }
-function closeExp() {
+function closeExp () {
   showExpModal.value = false
   editingExp.value = null
 }
 
-function saveExperience() {
+function saveExperience () {
   if (editingExp.value) {
     expForm.patch(route('students.experiences.update', editingExp.value.id), {
       preserveScroll: true,
@@ -304,7 +328,7 @@ function saveExperience() {
     })
   }
 }
-function deleteExperience(x) {
+function deleteExperience (x) {
   if (!confirm('¿Eliminar esta experiencia?')) return
   router.delete(route('students.experiences.destroy', x.id), { preserveScroll: true })
 }
@@ -374,7 +398,12 @@ function deleteExperience(x) {
           </div>
         </div>
         <div class="mt-2 text-xs text-red-600">
-          {{ form.errors.avatar || form.errors.cv || form.errors.cover_letter || form.errors['other_certs.*'] }}
+          {{
+            form.errors.avatar ||
+            form.errors.cv ||
+            form.errors.cover_letter ||
+            form.errors['other_certs.*']
+          }}
         </div>
       </section>
 
@@ -389,7 +418,9 @@ function deleteExperience(x) {
               type="text"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
-            <div v-if="form.errors.dni" class="mt-1 text-xs text-red-600">{{ form.errors.dni }}</div>
+            <div v-if="form.errors.dni" class="mt-1 text-xs text-red-600">
+              {{ form.errors.dni }}
+            </div>
           </div>
           <div>
             <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Teléfono</label>
@@ -398,7 +429,9 @@ function deleteExperience(x) {
               type="text"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
-            <div v-if="form.errors.phone" class="mt-1 text-xs text-red-600">{{ form.errors.phone }}</div>
+            <div v-if="form.errors.phone" class="mt-1 text-xs text-red-600">
+              {{ form.errors.phone }}
+            </div>
           </div>
           <div>
             <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Fecha de nacimiento</label>
@@ -407,10 +440,12 @@ function deleteExperience(x) {
               type="date"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
-            <div v-if="form.errors.birth_date" class="mt-1 text-xs text-red-600">{{ form.errors.birth_date }}</div>
+            <div v-if="form.errors.birth_date" class="mt-1 text-xs text-red-600">
+              {{ form.errors.birth_date }}
+            </div>
           </div>
           <div>
-            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Ciudad</label>
+            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Ciudad / población</label>
             <input
               v-model="form.city"
               type="text"
@@ -435,11 +470,19 @@ function deleteExperience(x) {
           </div>
           <div class="flex items-center gap-6 sm:col-span-2">
             <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input v-model="form.has_driver_license" type="checkbox" class="rounded border-gray-300 dark:border-gray-700" />
+              <input
+                v-model="form.has_driver_license"
+                type="checkbox"
+                class="rounded border-gray-300 dark:border-gray-700"
+              >
               Carnet de conducir
             </label>
             <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-              <input v-model="form.has_vehicle" type="checkbox" class="rounded border-gray-300 dark:border-gray-700" />
+              <input
+                v-model="form.has_vehicle"
+                type="checkbox"
+                class="rounded border-gray-300 dark:border-gray-700"
+              >
               Vehículo propio
             </label>
           </div>
@@ -495,11 +538,11 @@ function deleteExperience(x) {
             <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Modalidad FP</label>
             <div class="flex items-center gap-4">
               <label class="inline-flex items-center gap-2 text-sm">
-                <input v-model="form.fp_modality" type="radio" value="dual" />
+                <input v-model="form.fp_modality" type="radio" value="dual">
                 Dual
               </label>
               <label class="inline-flex items-center gap-2 text-sm">
-                <input v-model="form.fp_modality" type="radio" value="general" />
+                <input v-model="form.fp_modality" type="radio" value="general">
                 General
               </label>
             </div>
@@ -518,46 +561,43 @@ function deleteExperience(x) {
               class="w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             >
               <option value="">— Selecciona —</option>
-              <option value="mañana">Mañana</option>
-              <option value="tarde">Tarde</option>
-              <option value="ambas">Ambas</option>
+              <option value="morning">Mañana</option>
+              <option value="afternoon">Tarde</option>
+              <option value="both">Ambas</option>
             </select>
           </div>
-
-          <!-- Modalidad: MULTI-SELECCIÓN -->
-          <div class="sm:col-span-2">
-            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Modalidad que aceptarías</label>
-            <div class="flex flex-wrap gap-4">
-              <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+          <div>
+            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Modalidad</label>
+            <div class="flex flex-wrap gap-3">
+              <label class="inline-flex items-center gap-2 text-sm">
                 <input
+                  v-model="form.work_modalities"
                   type="checkbox"
                   value="presencial"
-                  v-model="form.work_modalities"
-                  class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800"
-                />
+                  class="rounded border-gray-300 dark:border-gray-700"
+                >
                 Presencial
               </label>
-              <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+              <label class="inline-flex items-center gap-2 text-sm">
                 <input
-                  type="checkbox"
-                  value="hibrida"
                   v-model="form.work_modalities"
-                  class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800"
-                />
-                Híbrida
-              </label>
-              <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-                <input
                   type="checkbox"
                   value="remota"
-                  v-model="form.work_modalities"
-                  class="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500 dark:border-gray-700 dark:bg-gray-800"
-                />
+                  class="rounded border-gray-300 dark:border-gray-700"
+                >
                 Remota
+              </label>
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input
+                  v-model="form.work_modalities"
+                  type="checkbox"
+                  value="hibrida"
+                  class="rounded border-gray-300 dark:border-gray-700"
+                >
+                Híbrida
               </label>
             </div>
           </div>
-
           <div v-if="isHybrid">
             <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Días en remoto</label>
             <input
@@ -588,16 +628,18 @@ function deleteExperience(x) {
           </div>
           <div class="flex items-center gap-6 sm:col-span-2">
             <label class="inline-flex items-center gap-2 text-sm">
-              <input v-model="form.transport_own" type="checkbox" />
+              <input v-model="form.transport_own" type="checkbox">
               Transporte propio
             </label>
             <label class="inline-flex items-center gap-2 text-sm">
-              <input v-model="form.relocate" type="checkbox" />
+              <input v-model="form.relocate" type="checkbox">
               Puedo desplazarme
             </label>
           </div>
           <div class="sm:col-span-2">
-            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Ciudades a las que puedes desplazarte</label>
+            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">
+              Ciudades a las que puedes desplazarte
+            </label>
             <div class="flex flex-wrap gap-2">
               <input
                 v-model="form.newRelocateCity"
@@ -708,37 +750,39 @@ function deleteExperience(x) {
               class="w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
             />
           </div>
+
+          <!-- Competencias técnicas (para compatibilidad) -->
           <div class="sm:col-span-2">
-            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Competencias técnicas</label>
-            <div class="flex flex-wrap gap-2">
-              <input
-                v-model="form.newTech"
-                type="text"
-                placeholder="Ej. Laravel"
-                class="w-56 rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-                @keyup.enter="addItem('tech_competencies', 'newTech')"
-              />
-              <button
-                type="button"
-                @click="addItem('tech_competencies', 'newTech')"
-                class="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-gray-100 dark:text-gray-900"
+            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">
+              Competencias técnicas (se usan en la compatibilidad)
+            </label>
+            <div class="mt-2 max-h-52 space-y-1 overflow-y-auto rounded-lg border border-gray-200 p-3 text-sm dark:border-gray-700">
+              <label
+                v-for="c in allCompetencies"
+                :key="c.id"
+                class="flex items-center gap-2"
               >
-                Añadir
-              </button>
+                <input
+                  v-model="form.competency_ids"
+                  type="checkbox"
+                  :value="c.id"
+                  class="rounded border-gray-300 dark:border-gray-700"
+                >
+                <span class="text-gray-800 dark:text-gray-100">
+                  {{ c.name }}
+                </span>
+              </label>
             </div>
-            <div class="mt-2 flex flex-wrap gap-2">
-              <span
-                v-for="(t, i) in form.tech_competencies"
-                :key="i"
-                class="rounded-full bg-gray-100 px-3 py-1 text-xs dark:bg-gray-800"
-              >
-                {{ t }}
-                <button class="ms-2 text-gray-500" @click="removeItem('tech_competencies', i)">✕</button>
-              </span>
-            </div>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              Esta lista es la misma que usan las vacantes para calcular la compatibilidad.
+            </p>
           </div>
+
+          <!-- Soft skills (solo informativo, no se usa en compatibilidad) -->
           <div class="sm:col-span-2">
-            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Habilidades personales</label>
+            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">
+              Habilidades personales (solo informativas)
+            </label>
             <div class="flex flex-wrap gap-2">
               <input
                 v-model="form.newSoft"
@@ -766,48 +810,76 @@ function deleteExperience(x) {
               </span>
             </div>
           </div>
+
+          <!-- Idiomas estructurados (para compatibilidad) -->
           <div class="sm:col-span-2">
-            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Idiomas</label>
+            <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">
+              Idiomas (se usan en la compatibilidad)
+            </label>
             <div class="flex flex-wrap items-center gap-2">
-              <input
-                v-model="form.newLangName"
-                type="text"
-                placeholder="Idioma"
+              <select
+                v-model="form.newLangLanguageId"
                 class="w-40 rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              />
-              <input
+              >
+                <option value="">Idioma…</option>
+                <option
+                  v-for="lang in allLanguages"
+                  :key="lang.id"
+                  :value="lang.id"
+                >
+                  {{ lang.name }} ({{ lang.code }})
+                </option>
+              </select>
+              <select
                 v-model="form.newLangLevel"
-                type="text"
-                placeholder="Nivel (A2, B1, C1…)"
-                class="w-40 rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-              />
+                class="w-32 rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
+              >
+                <option value="">Nivel…</option>
+                <option value="A1">A1</option>
+                <option value="A2">A2</option>
+                <option value="B1">B1</option>
+                <option value="B2">B2</option>
+                <option value="C1">C1</option>
+                <option value="C2">C2</option>
+              </select>
               <button
                 type="button"
-                @click="addLanguage"
+                @click="addLanguageItem"
                 class="rounded-lg bg-gray-900 px-3 py-2 text-sm text-white dark:bg-gray-100 dark:text-gray-900"
               >
                 Añadir
               </button>
             </div>
+
             <ul class="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <li
-                v-for="(lng, i) in form.languages"
+                v-for="(item, i) in form.language_items"
                 :key="i"
                 class="flex items-center justify-between rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-gray-800/60"
               >
                 <span class="truncate">
-                  <strong>{{ lng.name }}</strong><span v-if="lng.level"> · {{ lng.level }}</span>
+                  <strong>
+                    {{
+                      allLanguages.find(l => String(l.id) === String(item.language_id))?.name || 'Idioma'
+                    }}
+                  </strong>
+                  <span v-if="item.level"> · {{ item.level }}</span>
                 </span>
                 <button
                   type="button"
-                  @click="removeLanguage(i)"
+                  @click="removeLanguageItem(i)"
                   class="text-xs text-gray-500 hover:text-red-600"
                 >
                   Eliminar
                 </button>
               </li>
             </ul>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              El listado de idiomas y niveles es el mismo que usan las vacantes para calcular la compatibilidad.
+            </p>
           </div>
+
+          <!-- Certificaciones (decorativas / CV) -->
           <div class="sm:col-span-2">
             <label class="block text-sm text-gray-600 dark:text-gray-300 mb-1">Certificaciones</label>
             <div class="flex flex-wrap gap-2">
@@ -859,9 +931,12 @@ function deleteExperience(x) {
             class="flex items-center justify-between rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-800/60"
           >
             <div>
-              <div class="font-medium text-gray-800 dark:text-gray-100">{{ e.title }}</div>
+              <div class="font-medium text-gray-800 dark:text-gray-100">
+                {{ e.title }}
+              </div>
               <div class="text-gray-500 dark:text-gray-400">
-                <span v-if="e.center">{{ e.center }} · </span>{{ e.start_date || '—' }} — {{ e.end_date || 'Actual' }}
+                <span v-if="e.center">{{ e.center }} · </span>
+                {{ e.start_date || '—' }} — {{ e.end_date || 'Actual' }}
               </div>
             </div>
             <div class="flex items-center gap-2">
@@ -882,7 +957,9 @@ function deleteExperience(x) {
             </div>
           </div>
         </div>
-        <p v-else class="text-sm text-gray-500 dark:text-gray-400">Aún no has añadido formación.</p>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">
+          Aún no has añadido formación.
+        </p>
       </section>
 
       <!-- Experiencia (CRUD) -->
@@ -917,7 +994,9 @@ function deleteExperience(x) {
                   No formal
                 </span>
               </div>
-              <div v-if="x.functions" class="text-gray-700 dark:text-gray-300">{{ x.functions }}</div>
+              <div v-if="x.functions" class="text-gray-700 dark:text-gray-300">
+                {{ x.functions }}
+              </div>
             </div>
             <div class="flex items-center gap-2">
               <button
@@ -937,7 +1016,9 @@ function deleteExperience(x) {
             </div>
           </div>
         </div>
-        <p v-else class="text-sm text-gray-500 dark:text-gray-400">Aún no has añadido experiencia.</p>
+        <p v-else class="text-sm text-gray-500 dark:text-gray-400">
+          Aún no has añadido experiencia.
+        </p>
       </section>
 
       <!-- Enlaces -->
@@ -1005,9 +1086,7 @@ function deleteExperience(x) {
     <!-- ===== MODAL Formación ===== -->
     <div v-if="showEduModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" @click="closeEdu"></div>
-      <div
-        class="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-800 dark:bg-gray-900"
-      >
+      <div class="relative w-full max-w-lg rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-800 dark:bg-gray-900">
         <h3 class="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
           {{ editingEdu ? 'Editar formación' : 'Añadir formación' }}
         </h3>
@@ -1073,9 +1152,7 @@ function deleteExperience(x) {
     <!-- ===== MODAL Experiencia ===== -->
     <div v-if="showExpModal" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-black/40" @click="closeExp"></div>
-      <div
-        class="relative w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-800 dark:bg-gray-900"
-      >
+      <div class="relative w-full max-w-xl rounded-2xl border border-gray-200 bg-white p-5 shadow-xl dark:border-gray-800 dark:bg-gray-900">
         <h3 class="mb-4 text-base font-semibold text-gray-900 dark:text-gray-100">
           {{ editingExp ? 'Editar experiencia' : 'Añadir experiencia' }}
         </h3>
@@ -1123,10 +1200,14 @@ function deleteExperience(x) {
               v-model="expForm.functions"
               rows="3"
               class="w-full rounded-lg border border-gray-300 px-3 py-2 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
-            ></textarea>
+            />
           </div>
           <label class="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <input v-model="expForm.is_non_formal" type="checkbox" class="rounded border-gray-300 dark:border-gray-700" />
+            <input
+              v-model="expForm.is_non_formal"
+              type="checkbox"
+              class="rounded border-gray-300 dark:border-gray-700"
+            >
             Experiencia no formal
           </label>
         </div>
