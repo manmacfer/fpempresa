@@ -17,14 +17,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Dashboard
     Route::get('/dashboard', [VacancyController::class, 'dashboard'])->name('dashboard');
 
-    // ---- VACANTES (GENERAL) ----
-    // 1) Índice general
-    //
-    // AHORA:
-    // - Para alumnos: VacancyStudentController@index -> usa CompatibilityService y devuelve vacantes ordenadas por score (>=50%)
-    // - Para el resto de roles, dentro del controller puedes delegar a VacancyController@index si quieres.
-    Route::get('/vacantes', [VacancyStudentController::class, 'index'])->name('vacancies.index');
-
     // 2) Rutas SOLO empresa (colocadas ANTES de /vacantes/{vacancy})
     Route::middleware(['role:company'])->group(function () {
         Route::get('/vacantes/crear', [VacancyController::class, 'create'])->name('vacancies.create');
@@ -47,8 +39,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::patch('matchings/{matching}/accept', [MatchingController::class, 'accept'])->name('matchings.accept');
     Route::patch('matchings/{matching}/reject', [MatchingController::class, 'reject'])->name('matchings.reject');
 
-    // --- PERFIL ALUMNO (sin ID) ---
+    // --- PERFIL ALUMNO (sin ID) + LISTADO DE VACANTES PARA ALUMNO ---
     Route::middleware(['role:student'])->group(function () {
+        // Índice de vacantes con compatibilidad (solo alumnos)
+        Route::get('/vacantes', [VacancyStudentController::class, 'index'])->name('vacancies.index');
+
         Route::get('/students/me', fn () => redirect()->route('students.edit.me'))->name('students.me.redirect');
         Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
         Route::match(['post', 'put', 'patch'], '/students/me', [StudentController::class, 'updateMe'])->name('students.update.me');
