@@ -64,8 +64,9 @@ class Student extends Model
     public function languages()
     {
         return $this->belongsToMany(\App\Models\Language::class, 'alumno_idioma', 'student_id', 'language_id')
-            ->withPivot(['nivel']);
+            ->withPivot('nivel');
     }
+
 
     public function competencies()
     {
