@@ -166,7 +166,7 @@ const isHybrid = computed(() => form.work_modality === 'hibrida')
 function submit() {
   form
     .transform((d) => ({
-      // files
+      // ficheros (no serializar)
       avatar: d.avatar,
       cv: d.cv,
       cover_letter: d.cover_letter,
@@ -180,7 +180,6 @@ function submit() {
       postal_code: emptyToNull(d.postal_code),
       city: emptyToNull(d.city),
       province: emptyToNull(d.province),
-      municipality: emptyToNull(d.municipality),
       has_driver_license: boolOrNull(d.has_driver_license),
       has_vehicle: boolOrNull(d.has_vehicle),
 
@@ -193,23 +192,27 @@ function submit() {
 
       // disponibilidad
       availability_slot: emptyToNull(d.availability_slot),
-      commitments: d.commitments,
+      // serializamos arrays/objetos a JSON para FormData (el controlador decodifica si llega string)
+      commitments: JSON.stringify(d.commitments || []),
       relocate: boolOrNull(d.relocate),
-      relocate_cities: d.relocate_cities,
+      relocate_cities: JSON.stringify(d.relocate_cities || []),
       transport_own: boolOrNull(d.transport_own),
       work_modality: emptyToNull(d.work_modality),
       remote_days: isHybrid.value ? numOrNull(d.remote_days) : null,
       days_per_week: numOrNull(d.days_per_week),
       available_from: emptyToNull(d.available_from),
 
-      // intereses
-      sectors: d.sectors,
+      // intereses / perfil
+      sectors: JSON.stringify(d.sectors || []),
       preferred_company_type: emptyToNull(d.preferred_company_type),
       non_formal_experience: emptyToNull(d.non_formal_experience),
-      tech_competencies: d.tech_competencies,
-      soft_skills: d.soft_skills,
-      languages: d.languages,
-      certifications: d.certifications,
+      tech_competencies: JSON.stringify(d.tech_competencies || []),
+      soft_skills: JSON.stringify(d.soft_skills || []),
+      // compatibilidad: ids de catálogo de competencias (si usas ese control)
+      competency_ids: d.competency_ids ?? d.selectedCompetencyIds ?? [],
+      // idiomas: array de objetos { language_id, level }
+      languages: JSON.stringify(d.languages || []),
+      certifications: JSON.stringify(d.certifications || []),
 
       // extra
       hobbies: emptyToNull(d.hobbies),
@@ -223,6 +226,7 @@ function submit() {
       link_github: emptyToNull(d.link_github),
       link_video: emptyToNull(d.link_video),
     }))
+    // forceFormData para manejar ficheros; el controlador decodifica JSON-strings
     .post(route('students.update.me'), { forceFormData: true })
 }
 

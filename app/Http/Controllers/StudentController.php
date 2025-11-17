@@ -44,8 +44,36 @@ class StudentController extends Controller
     {
         $student = Student::firstOrCreate(['user_id' => $request->user()->id]);
 
-        Log::info('students.update.me payload', $request->all());
+        Log::info('students.update.me payload (raw)', $request->all());
 
+        // Si el frontend envía algunos campos como JSON-string (p. ej. JSON.stringify),
+        // decodificamos antes de validar para que las reglas 'array' funcionen.
+        $jsonFields = [
+            'commitments',
+            'relocate_cities',
+            'sectors',
+            'tech_competencies',
+            'soft_skills',
+            'certifications',
+            'languages',
+            'competency_ids',
+        ];
+
+        $raw = $request->all();
+        foreach ($jsonFields as $f) {
+            if (isset($raw[$f]) && is_string($raw[$f])) {
+                $decoded = json_decode($raw[$f], true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    // Si decodifica a null (p.ej. "null"), convertir a [] para arrays esperados
+                    if ($decoded === null) {
+                        $decoded = [];
+                    }
+                    $request->merge([$f => $decoded]);
+                }
+            }
+        }
+
+        // Validación
         $data = $request->validate([
             // personales / contacto
             'dni'                 => ['nullable', 'string', 'max:50'],
@@ -116,6 +144,8 @@ class StudentController extends Controller
             'other_certs'         => ['nullable', 'array'],
             'other_certs.*'       => ['file', 'mimes:pdf,jpg,jpeg,png', 'max:8192'],
         ]);
+
+        Log::info('students.update.me payload (validated)', $data);
 
         // Sacamos arrays de relaciones antes del fill
         $competencyIds   = $data['competency_ids'] ?? null;
