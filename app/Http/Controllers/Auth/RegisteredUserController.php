@@ -57,10 +57,20 @@ class RegisteredUserController extends Controller
                 'first_name'            => ['required','string','max:100'],
                 'last_name'             => ['required','string','max:150'],
                 'cycle'                 => ['required','string','max:20'],
+                'classroom_number'      => ['required','string','max:50'],
                 'email'                 => ['required','string','lowercase','email','max:255','unique:'.User::class],
                 'password'              => ['required','confirmed', Rules\Password::defaults()],
                 'password_confirmation' => ['required'],
             ]);
+
+            // Buscar el classroom por su número personalizado
+            $classroom = \App\Models\Classroom::where('classroom_number', $validated['classroom_number'])->first();
+
+            if (!$classroom) {
+                return back()->withErrors([
+                    'classroom_number' => 'El número de classroom no existe. Verifica con tu profesor.'
+                ])->withInput();
+            }
 
             $roleId = Role::where('slug','student')->value('id') ?? 3;
 
@@ -75,10 +85,12 @@ class RegisteredUserController extends Controller
             ]);
 
             Student::create([
-                'user_id'    => $user->id,
-                'first_name' => $validated['first_name'],
-                'last_name'  => $validated['last_name'],
-                'cycle'      => $validated['cycle'],
+                'user_id'      => $user->id,
+                'first_name'   => $validated['first_name'],
+                'last_name'    => $validated['last_name'],
+                'cycle'        => $validated['cycle'],
+                'classroom_id' => $classroom->id,
+                'validated'    => false, // Por defecto no validado
             ]);
         }
 

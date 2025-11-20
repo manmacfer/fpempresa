@@ -8,12 +8,12 @@ return new class extends Migration {
     public function up(): void {
         Schema::create('rejections', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('application_id')->constrained('applications')->cascadeOnDelete();
-            $table->foreignId('created_by')->constrained('users')->cascadeOnDelete(); // quién rechazó (empresa/admin)
+            $table->foreignId('vacancy_id')->constrained('vacancies')->cascadeOnDelete();
+            $table->foreignId('student_id')->constrained('students')->cascadeOnDelete();
             $table->text('reason')->nullable();
             $table->timestamps();
 
-            $table->unique('application_id'); // una sola entrada de rechazo por solicitud
+            $table->unique(['vacancy_id', 'student_id']); // una sola entrada de rechazo por alumno+vacante
         });
     }
     public function down(): void {

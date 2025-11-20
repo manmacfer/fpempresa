@@ -2,6 +2,24 @@
 @tailwind components;
 @tailwind utilities;
 
+/* === Cursor pointer para elementos interactivos === */
+button,
+a,
+[role="button"],
+[type="button"],
+[type="submit"],
+[type="reset"],
+label[for],
+select {
+  cursor: pointer;
+}
+
+button:disabled,
+a:disabled,
+[disabled] {
+  cursor: not-allowed;
+}
+
 /* === Legibilidad en modo oscuro para inputs/selects/textarea === */
 :root .dark input,
 :root .dark select,

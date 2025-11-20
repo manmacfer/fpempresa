@@ -24,7 +24,15 @@ class Company extends Model
         'contact_email',
         'description',
         'name',
+        'logo_path',
     ];
+
+    protected $appends = ['logo_url'];
+
+    public function getLogoUrlAttribute()
+    {
+        return $this->logo_path ? asset('storage/' . $this->logo_path) : null;
+    }
 
     public function user(): BelongsTo
     {

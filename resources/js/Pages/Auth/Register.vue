@@ -1,8 +1,10 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3'
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 
 const active = ref('student')
+const classrooms = ref([])
+const loadingClassrooms = ref(false)
 
 const form = useForm({
   // comunes
@@ -15,6 +17,7 @@ const form = useForm({
   first_name: '',
   last_name: '',
   cycle: '',
+  classroom_number: '',
 
   // empresa
   company_name: '',
@@ -29,6 +32,24 @@ function switchTo(r) {
 function submit() {
   form.post('/register')
 }
+
+async function loadClassrooms() {
+  loadingClassrooms.value = true
+  try {
+    const response = await fetch('/api/classrooms')
+    if (response.ok) {
+      classrooms.value = await response.json()
+    }
+  } catch (error) {
+    console.error('Error cargando classrooms:', error)
+  } finally {
+    loadingClassrooms.value = false
+  }
+}
+
+onMounted(() => {
+  loadClassrooms()
+})
 </script>
 
 <template>
@@ -72,6 +93,23 @@ function submit() {
               <option value="2 DAW">2 DAW</option>
             </select>
           </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Número de Classroom</label>
+            <select 
+              v-model="form.classroom_number" 
+              class="mt-1 w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100"
+              :disabled="loadingClassrooms"
+              required
+            >
+              <option value="" disabled>
+                {{ loadingClassrooms ? 'Cargando...' : 'Selecciona tu classroom' }}
+              </option>
+              <option v-for="classroom in classrooms" :key="classroom" :value="classroom">
+                {{ classroom }}
+              </option>
+            </select>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Selecciona el número de classroom que te ha dado tu profesor</p>
+          </div>
         </div>
 
         <div v-else class="space-y-3">
@@ -101,8 +139,8 @@ function submit() {
           <div v-for="(e,k) in form.errors" :key="k">{{ e }}</div>
         </div>
 
-        <button :disabled="form.processing" class="w-full py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700">
-          Crear cuenta
+                <button :disabled="form.processing" class="w-full py-2 rounded-xl bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60">
+          Registrarse
         </button>
 
         <p class="text-center text-sm text-gray-500 dark:text-gray-400">

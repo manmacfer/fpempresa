@@ -22,41 +22,40 @@ class VacancyStudentController extends Controller
             abort(403);
         }
 
-        // Filtros que ya usa tu vista (de momento solo los devolvemos tal cual)
-        $filters = $request->only(['ciclo', 'modalidad', 'ubicacion']);
+        // Filtros (usar keys en inglés)
+        $filters = $request->only(['cycle', 'mode', 'location']);
 
-        // Compatibilidad >= 50
-        $matches = $compatibility->forStudent($student, 50);
+        // Compatibilidad >= 0 (mostrar todas con su porcentaje), pasando filtros
+        $matches = $compatibility->forStudent($student, 0, $filters);
 
-        // Transformamos a lo que espera Vacancies/Index.vue
+        // Transformamos a lo que espera Vacancies/Index.vue / CompatIndex.vue
         $items = $matches->map(function (array $row) {
             /** @var \App\Models\Vacancy $vacancy */
             $vacancy = $row['vacancy'];
 
+            // Normalizar mode a español
+            $mode = $vacancy->mode ?? $vacancy->modalidad ?? null;
+            $mode = $this->normalizeMode($mode);
+
             return [
-                'id'              => $vacancy->id,
-                'title'           => $vacancy->title,
-                'city'            => $vacancy->city,
-                'province'        => $vacancy->province,
-                'ubicacion'       => $vacancy->ubicacion,
-                'modalidad'       => $vacancy->modalidad,     // PRESENCIAL/HIBRIDA/REMOTA
-                'mode'            => $vacancy->mode,           // horario preferente (mañana/tarde…)
-                'ciclo_requerido' => $vacancy->cycle_required,
-                'cycle_required'  => $vacancy->cycle_required,
-                'created_at'      => optional($vacancy->created_at)->toDateTimeString(),
-                'status'          => $vacancy->status,
-                'company'         => $vacancy->company->trade_name
+                'id'                => $vacancy->id,
+                'title'             => $vacancy->title,
+                'city'              => $vacancy->city,
+                'province'          => $vacancy->province,
+                'mode'              => $mode,
+                'cycle_required'    => $vacancy->cycle_required,
+                'availability_slot' => $vacancy->availability_slot,
+                'created_at'        => optional($vacancy->created_at)->toDateTimeString(),
+                'status'            => $vacancy->status,
+                'company'           => $vacancy->company->trade_name
                     ?? $vacancy->company->legal_name
                     ?? $vacancy->company->name,
-                'score'           => $row['score'],
-                'breakdown'       => $row['breakdown'],
+                'score'             => $row['score'] ?? 0,
+                'breakdown'         => $row['breakdown'] ?? [],
             ];
         });
 
-        // (Opcional) aquí podríamos aplicar filtros sobre $items si quieres que sigan funcionando,
-        // pero de momento lo dejamos tal cual para centrarnos en que salga la compatibilidad.
-
-        // Paginación manual sobre la colección
+        // Paginación manual sobre la colección (se mantiene por compatibilidad)
         $page    = (int) $request->input('page', 1);
         $perPage = 9;
 
@@ -71,9 +70,28 @@ class VacancyStudentController extends Controller
             ]
         );
 
-        return Inertia::render('Vacancies/Index', [
+        // Devolvemos también 'items' para CompatIndex.vue (array simple) y mantenemos 'vacantes' paginadas
+        return Inertia::render('Vacancies/CompatIndex', [
+            'items'    => $items->values()->all(),
             'vacantes' => $paginated,
             'filters'  => $filters,
         ]);
+    }
+
+    /**
+     * Normalizar mode de inglés a español
+     */
+    private function normalizeMode(?string $mode): ?string
+    {
+        if (!$mode) return null;
+
+        $normalized = strtolower(trim($mode));
+
+        return match ($normalized) {
+            'onsite', 'on-site' => 'presencial',
+            'remote', 'teletrabajo' => 'remoto',
+            'hybrid', 'hibrido', 'híbrido' => 'hibrido',
+            default => $normalized,
+        };
     }
 }

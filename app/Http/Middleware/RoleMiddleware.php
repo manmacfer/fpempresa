@@ -26,9 +26,10 @@ class RoleMiddleware
         $id     = isset($user->role_id) ? (string)$user->role_id : null;  // p.ej. '4'
         $legacy = $user->role ?? null;                          // p.ej. 'company' (columna string en users)
 
-        // Fallback “perfil existe”
+        // Fallback "perfil existe"
         $hasCompany = method_exists($user, 'company') && $user->company()->exists();
         $hasStudent = method_exists($user, 'student') && $user->student()->exists();
+        $hasTeacher = method_exists($user, 'teacher') && $user->teacher()->exists();
 
         // Normalización de los roles pedidos en la ruta
         $needles = array_map(function ($r) {
@@ -53,6 +54,10 @@ class RoleMiddleware
         // Fallback por existencia de perfil (si se pidió 'student' o '3')
         if (!$granted && (in_array('student', $needles, true) || in_array('3', $needles, true))) {
             if ($hasStudent) { $granted = true; }
+        }
+        // Fallback por existencia de perfil (si se pidió 'teacher' o '2')
+        if (!$granted && (in_array('teacher', $needles, true) || in_array('2', $needles, true))) {
+            if ($hasTeacher) { $granted = true; }
         }
 
         if ($granted) {

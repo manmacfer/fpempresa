@@ -1,0 +1,47 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\Conversation;
+use App\Models\Message;
+use Illuminate\Http\Request;
+
+class MessageController extends Controller
+{
+    /**
+     * Enviar un mensaje en una conversación
+     */
+    public function store(Request $request, Conversation $conversation)
+    {
+        $request->validate([
+            'content' => 'required|string|max:5000'
+        ]);
+
+        // Verificar que el usuario puede participar en esta conversación
+        $matching = $conversation->matching;
+        $user = $request->user();
+
+        $canParticipate = false;
+        
+        if ($user->student && $matching->student_id === $user->student->id) {
+            $canParticipate = true;
+        } elseif ($user->company && $matching->company_id === $user->company->id) {
+            $canParticipate = true;
+        } elseif ($user->teacher) {
+            // El profesor puede participar en todas las conversaciones
+            $canParticipate = true;
+        }
+
+        if (!$canParticipate) {
+            return back()->with('error', 'No tienes permiso para enviar mensajes en esta conversación.');
+        }
+
+        Message::create([
+            'conversation_id' => $conversation->id,
+            'user_id' => $user->id,
+            'content' => $request->input('content')
+        ]);
+
+        return back()->with('success', 'Mensaje enviado correctamente.');
+    }
+}

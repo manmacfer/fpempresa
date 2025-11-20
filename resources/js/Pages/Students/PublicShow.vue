@@ -1,18 +1,35 @@
 <script setup>
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout.vue'
-import { Link } from '@inertiajs/vue3'
+import { Link, usePage } from '@inertiajs/vue3'
 import { computed } from 'vue'
 
 const props = defineProps({
   student: { type: Object, required: true },
 })
 
+const page = usePage()
+
 const displayName = computed(() => props.student.user_name || 'Alumno')
+
+// Verificar si el usuario actual es el dueño del perfil
+const isOwner = computed(() => {
+  const authStudentId = page.props.auth?.studentId
+  return authStudentId && authStudentId === props.student.id
+})
 
 function fmtDate(iso) {
   if (!iso) return null
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+const formatWorkModality = (mod) => {
+  if (!mod) return null
+  if (mod === 'presencial') return 'Presencial'
+  if (mod === 'remota') return 'Remota'
+  if (mod === 'hibrida' || mod === 'híbrida') return 'Híbrida'
+  if (mod === 'indiferente') return 'Indiferente'
+  return mod
 }
 
 const hasPersonal = computed(() =>
@@ -52,80 +69,116 @@ const hasDocuments = computed(() =>
 
 <template>
   <AuthenticatedLayout>
-    <template #header>
-      <div class="flex items-center justify-between">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-          Perfil público
-        </h2>
-        <Link :href="route('students.edit.me')" class="text-sm text-indigo-600 hover:underline dark:text-indigo-400">
-          Editar mi perfil
-        </Link>
-      </div>
-    </template>
-
-    <div class="mx-auto max-w-5xl p-6 space-y-6">
-      <!-- HEAD -->
-      <section class="rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
-        <div class="flex items-center gap-5">
-          <div class="flex-shrink-0">
-            <img
-              v-if="student.avatar_url"
-              :src="student.avatar_url"
-              alt="avatar"
-              class="h-24 w-24 rounded-full object-cover ring-2 ring-white shadow-sm dark:ring-gray-800"
-            />
-            <div
-              v-else
-              class="flex h-24 w-24 items-center justify-center rounded-full bg-gray-100 text-3xl font-semibold text-gray-600 ring-2 ring-white shadow-sm dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-700"
-            >
-              {{ displayName.slice(0,1) }}
+    <div class="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-gray-900 dark:via-gray-900 dark:to-indigo-950/20">
+      <div class="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
+        
+        <!-- Header con gradiente -->
+        <div class="mb-8 overflow-hidden rounded-2xl border border-gray-100 bg-gradient-to-br from-indigo-600 to-purple-600 p-8 shadow-xl dark:border-gray-800 dark:from-indigo-700 dark:to-purple-700">
+          <div class="flex items-center justify-between">
+            <div>
+              <h1 class="text-3xl font-bold text-white">Perfil Público</h1>
+              <p class="mt-2 text-indigo-100">{{ isOwner ? 'Visualización de tu perfil profesional' : 'Perfil del estudiante' }}</p>
             </div>
-          </div>
-
-          <div class="min-w-0">
-            <h1 class="truncate text-2xl font-bold text-gray-900 dark:text-gray-100">{{ displayName }}</h1>
-
-            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              <span v-if="student.cycle" class="inline-flex items-center gap-2 mr-3">
-                <span class="text-xs rounded-full bg-indigo-100 px-2 py-0.5 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">{{ student.cycle }}</span>
-              </span>
-
-              <span v-if="student.center" class="inline-block text-sm text-gray-500 dark:text-gray-400 mr-2">
-                <svg class="inline h-4 w-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"/></svg>
-                {{ student.center }}
-              </span>
-
-              <span v-if="student.city" class="inline-block text-sm text-gray-500 dark:text-gray-400">
-                <svg class="inline h-4 w-4 mr-1 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-3-3h-2M2 20h5v-2a3 3 0 00-3-3H2m13-3V7a2 2 0 00-2-2H9a2 2 0 00-2 2v7"/></svg>
-                {{ student.city }}
-              </span>
-            </p>
-          </div>
-
-          <div class="ml-auto hidden sm:flex sm:items-center sm:space-x-3">
-            <span v-if="student.user_role" class="text-xs text-gray-500 dark:text-gray-400">Rol: {{ student.user_role }}</span>
+            <Link 
+              v-if="isOwner"
+              :href="route('students.edit.me')" 
+              class="inline-flex items-center gap-2 rounded-xl border-2 border-white/30 bg-white/20 px-5 py-2.5 text-sm font-semibold text-white backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:bg-white/30"
+            >
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+              </svg>
+              Editar perfil
+            </Link>
           </div>
         </div>
-      </section>
 
-      <div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-        <!-- Main column -->
-        <div class="md:col-span-2 space-y-6">
-          <!-- Documentos -->
-          <section v-if="hasDocuments" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Documentos</h3>
-              <span class="text-xs text-gray-400">Descargas</span>
+        <!-- Card de presentación -->
+        <section class="mb-6 overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-xl dark:border-gray-800 dark:bg-gray-900">
+          <div class="p-8">
+            <div class="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+              <div class="flex-shrink-0">
+                <img
+                  v-if="student.avatar_url"
+                  :src="student.avatar_url"
+                  alt="avatar"
+                  class="h-32 w-32 rounded-2xl object-cover shadow-lg ring-4 ring-indigo-100 dark:ring-indigo-900/50"
+                />
+                <div
+                  v-else
+                  class="flex h-32 w-32 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 text-5xl font-bold text-indigo-600 shadow-lg ring-4 ring-indigo-100 dark:from-indigo-900/50 dark:to-purple-900/50 dark:text-indigo-300 dark:ring-indigo-900/50"
+                >
+                  {{ displayName.slice(0,1) }}
+                </div>
+              </div>
+
+              <div class="flex-1">
+                <h2 class="text-2xl font-bold text-gray-900 dark:text-white">{{ displayName }}</h2>
+                
+                <div class="mt-4 flex flex-wrap items-center gap-3">
+                  <span v-if="student.cycle" class="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1.5 text-sm font-semibold text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                    </svg>
+                    {{ student.cycle }}
+                  </span>
+
+                  <span v-if="student.center" class="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                    </svg>
+                    {{ student.center }}
+                  </span>
+
+                  <span v-if="student.city" class="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-gray-400">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                    {{ student.city }}
+                  </span>
+                </div>
+              </div>
             </div>
+          </div>
+        </section>
 
-            <div class="mt-4 space-y-3">
-              <div v-if="student.cv_url" class="flex items-center gap-3">
-                <a :href="student.cv_url" target="_blank" class="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">Currículum (CV)</a>
+        <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          <!-- Main column -->
+          <div class="lg:col-span-2 space-y-6">
+            <!-- Documentos -->
+            <section v-if="hasDocuments" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+              <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 dark:border-gray-800 dark:from-indigo-950/30 dark:to-purple-950/20">
+                <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                  <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  Documentos
+                </h3>
               </div>
 
-              <div v-if="student.cover_letter_url" class="flex items-center gap-3">
-                <a :href="student.cover_letter_url" target="_blank" class="text-sm font-medium text-indigo-600 hover:underline dark:text-indigo-400">Carta de presentación</a>
-              </div>
+              <div class="p-6 space-y-3">
+              <!-- CV Auto-generado (siempre disponible) -->
+              <a :href="route('students.cv.download', student.id)" class="flex items-center justify-between rounded-xl border-2 border-indigo-200 bg-gradient-to-r from-indigo-50 to-purple-50 p-4 transition-all hover:scale-[1.02] hover:shadow-lg hover:border-indigo-300 dark:border-indigo-800 dark:from-indigo-950/40 dark:to-purple-950/30 dark:hover:border-indigo-600">
+                <div class="flex items-center gap-3">
+                  <svg class="h-6 w-6 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  <div>
+                    <span class="block font-semibold text-gray-900 dark:text-white">Descargar Currículum (CV)</span>
+                    <span class="text-xs text-gray-600 dark:text-gray-400">Generado automáticamente desde el perfil</span>
+                  </div>
+                </div>
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              </a>
+
+              <a v-if="student.cover_letter_url" :href="student.cover_letter_url" target="_blank" class="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 transition-all hover:border-indigo-300 hover:bg-indigo-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600 dark:hover:bg-indigo-900/20">
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                </svg>
+                <span class="font-medium text-gray-900 dark:text-white">Carta de presentación</span>
+              </a>
 
               <div v-if="student.other_certs && student.other_certs.length" class="pt-1">
                 <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Otros certificados</div>
@@ -139,13 +192,17 @@ const hasDocuments = computed(() =>
           </section>
 
           <!-- Intereses y perfil -->
-          <section v-if="hasInterests" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <div class="flex items-center justify-between">
-              <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Intereses y perfil</h3>
-              <span class="text-xs text-gray-400">Visión rápida</span>
+          <section v-if="hasInterests" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+            <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 dark:border-gray-800 dark:from-indigo-950/30 dark:to-purple-950/20">
+              <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                </svg>
+                Intereses y perfil
+              </h3>
             </div>
 
-            <div class="mt-4 space-y-4">
+            <div class="p-6 space-y-5">
               <div v-if="student.sectors?.length" class="flex flex-wrap gap-2">
                 <div class="text-xs font-medium text-gray-500 dark:text-gray-400 w-full">Sectores</div>
                 <div class="flex flex-wrap gap-2">
@@ -153,22 +210,30 @@ const hasDocuments = computed(() =>
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div v-if="student.preferred_company_type">
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400">Tipo de empresa</div>
-                  <div class="mt-1 text-sm text-gray-800 dark:text-gray-200">{{ student.preferred_company_type }}</div>
-                </div>
-
-                <div v-if="student.non_formal_experience">
-                  <div class="text-xs font-medium text-gray-500 dark:text-gray-400">Experiencia no formal</div>
-                  <div class="mt-1 text-sm text-gray-800 dark:text-gray-200">{{ student.non_formal_experience }}</div>
-                </div>
+              <!-- Presentación (antes Experiencia no formal) - Ancho completo -->
+              <div v-if="student.non_formal_experience">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400">Presentación</div>
+                <div class="mt-1 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-line">{{ student.non_formal_experience }}</div>
               </div>
 
-              <div v-if="student.tech_competencies?.length">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400">Competencias técnicas</div>
-                <div class="mt-2 flex flex-wrap gap-2">
-                  <span v-for="(t,i) in student.tech_competencies" :key="i" class="rounded-full bg-indigo-50 px-3 py-1 text-xs text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200">{{ t }}</span>
+              <!-- Tipos de empresas de interés (antes Tipo de empresa) - Ancho completo -->
+              <div v-if="student.preferred_company_type">
+                <div class="text-xs font-medium text-gray-500 dark:text-gray-400">Tipos de empresas de interés</div>
+                <div class="mt-1 text-sm text-gray-800 dark:text-gray-200 capitalize">{{ student.preferred_company_type }}</div>
+              </div>
+
+              <div v-if="student.tech_competencies && student.tech_competencies.length" class="mt-4">
+                <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                  Tecnologías
+                </h3>
+                <div class="flex flex-wrap gap-2">
+                  <span
+                    v-for="t in student.tech_competencies"
+                    :key="t"
+                    class="px-2 py-1 rounded-full text-xs bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-200"
+                  >
+                    {{ t }}
+                  </span>
                 </div>
               </div>
 
@@ -274,9 +339,16 @@ const hasDocuments = computed(() =>
         <!-- Sidebar -->
         <div class="space-y-6">
           <!-- Datos personales -->
-          <section v-if="hasPersonal" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Datos personales</h3>
-            <dl class="mt-3 grid grid-cols-1 gap-3 text-sm">
+          <section v-if="hasPersonal" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+            <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-3 dark:border-gray-800 dark:from-indigo-950/30 dark:to-purple-950/20">
+              <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+                </svg>
+                Datos personales
+              </h3>
+            </div>
+            <dl class="p-5 grid grid-cols-1 gap-3 text-sm">
               <div v-if="student.dni" class="flex justify-between text-gray-900 dark:text-gray-100"><dt class="text-gray-500 dark:text-gray-400">DNI/NIE</dt><dd>{{ student.dni }}</dd></div>
               <div v-if="student.phone" class="flex justify-between text-gray-900 dark:text-gray-100"><dt class="text-gray-500 dark:text-gray-400">Teléfono</dt><dd>{{ student.phone }}</dd></div>
               <div v-if="student.birth_date" class="flex justify-between text-gray-900 dark:text-gray-100"><dt class="text-gray-500 dark:text-gray-400">Nacimiento</dt><dd>{{ fmtDate(student.birth_date) }}</dd></div>
@@ -291,9 +363,16 @@ const hasDocuments = computed(() =>
           </section>
 
           <!-- Académicos -->
-          <section v-if="hasAcademic" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Académicos</h3>
-            <dl class="mt-3 grid grid-cols-1 gap-3 text-sm">
+          <section v-if="hasAcademic" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+            <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-3 dark:border-gray-800 dark:from-indigo-950/30 dark:to-purple-950/20">
+              <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                </svg>
+                Académicos
+              </h3>
+            </div>
+            <dl class="p-5 grid grid-cols-1 gap-3 text-sm">
               <div v-if="student.cycle" class="flex justify-between text-gray-900 dark:text-gray-100"><dt class="text-gray-500 dark:text-gray-400">Ciclo</dt><dd>{{ student.cycle }}</dd></div>
               <div v-if="student.center" class="flex justify-between text-gray-900 dark:text-gray-100"><dt class="text-gray-500 dark:text-gray-400">Centro</dt><dd>{{ student.center }}</dd></div>
               <div v-if="student.year_start || student.year_end" class="flex justify-between text-gray-900 dark:text-gray-100"><dt class="text-gray-500 dark:text-gray-400">Años</dt>
@@ -303,18 +382,25 @@ const hasDocuments = computed(() =>
             </dl>
           </section>
 
-          <!-- Disponibilidad (mejor espaciada, igual que Académicos) -->
-          <section v-if="hasAvailability" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Disponibilidad</h3>
-            <dl class="mt-3 grid grid-cols-1 gap-3 text-sm">
+          <!-- Disponibilidad -->
+          <section v-if="hasAvailability" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+            <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-3 dark:border-gray-800 dark:from-indigo-950/30 dark:to-purple-950/20">
+              <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/>
+                </svg>
+                Disponibilidad
+              </h3>
+            </div>
+            <dl class="p-5 grid grid-cols-1 gap-3 text-sm">
               <div v-if="student.availability_slot" class="flex justify-between text-gray-900 dark:text-gray-100">
-                <dt class="text-gray-500 dark:text-gray-400">Franja</dt>
-                <dd>{{ student.availability_slot === 'both' ? 'Ambas' : (student.availability_slot === 'morning' ? 'Mañana' : 'Tarde') }}</dd>
+                <dt class="text-gray-500 dark:text-gray-400">Disponibilidad</dt>
+                <dd>{{ student.availability_slot === 'completa' ? 'Completa' : (student.availability_slot === 'manana' ? 'Mañana' : 'Tarde') }}</dd>
               </div>
 
               <div v-if="student.work_modality" class="flex justify-between text-gray-900 dark:text-gray-100">
                 <dt class="text-gray-500 dark:text-gray-400">Modalidad</dt>
-                <dd class="capitalize">{{ student.work_modality }}</dd>
+                <dd>{{ formatWorkModality(student.work_modality) }}</dd>
               </div>
 
               <div v-if="student.work_modality === 'hibrida' && student.remote_days != null" class="flex justify-between text-gray-900 dark:text-gray-100">
@@ -360,9 +446,16 @@ const hasDocuments = computed(() =>
           </section>
 
           <!-- Enlaces -->
-          <section v-if="hasLinks" class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
-            <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-300">Enlaces</h3>
-            <ul class="mt-3 space-y-2 text-sm">
+          <section v-if="hasLinks" class="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+            <div class="border-b border-gray-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-3 dark:border-gray-800 dark:from-indigo-950/30 dark:to-purple-950/20">
+              <h3 class="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-gray-700 dark:text-gray-300">
+                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                </svg>
+                Enlaces
+              </h3>
+            </div>
+            <ul class="p-5 space-y-2 text-sm">
               <li v-if="student.link_linkedin"><a :href="student.link_linkedin" target="_blank" class="text-indigo-600 hover:underline dark:text-indigo-400">LinkedIn</a></li>
               <li v-if="student.link_portfolio"><a :href="student.link_portfolio" target="_blank" class="text-indigo-600 hover:underline dark:text-indigo-400">Portfolio</a></li>
               <li v-if="student.link_github"><a :href="student.link_github" target="_blank" class="text-indigo-600 hover:underline dark:text-indigo-400">GitHub</a></li>
@@ -376,6 +469,8 @@ const hasDocuments = computed(() =>
          class="mt-6 text-center text-sm text-gray-500 dark:text-gray-400">
         Aún no hay información pública para este perfil.
       </p>
+
+      </div>
     </div>
   </AuthenticatedLayout>
 </template>

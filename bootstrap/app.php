@@ -22,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Alias personalizados de middleware de ruta (aquí va 'role')
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
+            'admin' => \App\Http\Middleware\EnsureUserIsAdmin::class,
+            'validated.student' => \App\Http\Middleware\EnsureStudentIsValidated::class,
             // puedes añadir otros alias aquí...
         ]);
     })
