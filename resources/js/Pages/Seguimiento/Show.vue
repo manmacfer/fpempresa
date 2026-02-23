@@ -57,6 +57,14 @@ const sendMessage = () => {
   })
 }
 
+// Delete document
+const deleteDocument = (doc) => {
+  if (!confirm(`¿Eliminar el documento "${doc.name}"? Esta acción no se puede deshacer.`)) return
+  router.delete(route('documents.destroy', doc.id), {
+    preserveScroll: true,
+  })
+}
+
 // Upload document
 const handleFileChange = (event) => {
   documentForm.file = event.target.files[0]
@@ -435,12 +443,20 @@ const getUserRole = (message) => {
                     </p>
                   </div>
                 </div>
-                <a 
-                  :href="route('documents.download', doc.id)"
-                  class="rounded-lg bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700"
-                >
-                  Descargar
-                </a>
+                <div class="flex items-center gap-2">
+                  <a 
+                    :href="route('documents.download', doc.id)"
+                    class="rounded-lg bg-indigo-600 px-3 py-1 text-sm text-white hover:bg-indigo-700"
+                  >
+                    Descargar
+                  </a>
+                  <button
+                    @click="deleteDocument(doc)"
+                    class="rounded-lg bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
+                  >
+                    Eliminar
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -458,6 +474,7 @@ const getUserRole = (message) => {
                   class="mt-1 w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 >
                   <option value="contract">Contrato</option>
+                  <option value="agreement">Convenio</option>
                   <option value="report">Informe</option>
                   <option value="certificate">Certificado</option>
                   <option value="other">Otro</option>

@@ -88,7 +88,7 @@
             </div>
 
             <div class="p-6">
-              <p v-if="m.vacancy?.description" class="text-sm leading-relaxed text-gray-700 dark:text-gray-300 line-clamp-3">
+              <p v-if="m.vacancy?.description" class="text-sm leading-relaxed text-gray-700 dark:text-gray-300 line-clamp-2">
                 {{ m.vacancy.description }}
               </p>
             </div>

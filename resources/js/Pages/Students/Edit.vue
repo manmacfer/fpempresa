@@ -37,7 +37,6 @@ const toggle = (list, value) => {
 const form = useForm({
   // archivos
   avatar: null,
-  cv: null,
   cover_letter: null,
   other_certs: [],
 
@@ -177,6 +176,30 @@ function onPickOtherCerts(e) {
   form.other_certs = Array.from(e.target.files || [])
 }
 
+function deleteCoverLetter() {
+  if (!confirm('¿Eliminar la carta de presentación actual?')) return
+  
+  router.delete(route('students.cover-letter.delete'), {
+    preserveScroll: true,
+    onSuccess: () => {
+      // Recargar para actualizar los datos
+      router.reload({ only: ['student'] })
+    }
+  })
+}
+
+function deleteCertificate(index) {
+  if (!confirm('¿Eliminar este certificado?')) return
+  
+  router.delete(route('students.certificate.delete'), {
+    data: { index },
+    preserveScroll: true,
+    onSuccess: () => {
+      router.reload({ only: ['student'] })
+    }
+  })
+}
+
 const isHybrid = computed(() => form.work_modality === 'hibrida')
 
 function submit() {
@@ -184,7 +207,6 @@ function submit() {
     .transform((d) => ({
       // ficheros
       avatar: d.avatar,
-      cv: d.cv,
       cover_letter: d.cover_letter,
       other_certs: d.other_certs,
 
@@ -385,27 +407,65 @@ function deleteExperience(x) {
               <p class="text-xs text-gray-500 dark:text-gray-400">PNG/JPG, máx. 2 MB.</p>
             </div>
           </div>
-          <div class="grid grid-cols-1 gap-3">
+          <div class="grid grid-cols-1 gap-4">
+            <!-- Carta de presentación -->
             <div>
-              <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">CV (PDF/DOC)</label>
-              <input
-                type="file"
-                accept=".pdf,.doc,.docx"
-                @change="e => (form.cv = e.target.files?.[0] || null)"
-                class="text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 dark:hover:file:bg-indigo-900/50"
-              />
-            </div>
-            <div>
-              <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Carta de presentación (opcional)</label>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Carta de presentación (opcional)</label>
+              
+              <!-- Carta actual -->
+              <div v-if="student.cover_letter_path" class="mb-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2 dark:bg-green-900/20">
+                <svg class="h-4 w-4 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <span class="flex-1 text-sm text-green-700 dark:text-green-300">Carta actual subida</span>
+                <button
+                  type="button"
+                  @click="deleteCoverLetter"
+                  class="rounded-lg p-1 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
+                  title="Eliminar"
+                >
+                  <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                  </svg>
+                </button>
+              </div>
+              
+              <!-- Subir nueva -->
               <input
                 type="file"
                 accept=".pdf,.doc,.docx"
                 @change="e => (form.cover_letter = e.target.files?.[0] || null)"
                 class="text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 dark:hover:file:bg-indigo-900/50"
               />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">PDF/DOC, máx. 5 MB. Reemplazará la actual si subes una nueva.</p>
             </div>
+
+            <!-- Certificados -->
             <div>
-              <label class="mb-1 block text-sm text-gray-600 dark:text-gray-300">Otros certificados (múltiples)</label>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Certificados (múltiples)</label>
+              
+              <!-- Certificados actuales -->
+              <div v-if="student.other_certs_paths && student.other_certs_paths.length > 0" class="mb-3 space-y-2">
+                <div v-for="(cert, index) in student.other_certs_paths" :key="index" 
+                     class="flex items-center gap-2 rounded-lg bg-blue-50 px-3 py-2 dark:bg-blue-900/20">
+                  <svg class="h-4 w-4 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                  <span class="flex-1 text-sm text-blue-700 dark:text-blue-300">Certificado {{ index + 1 }}</span>
+                  <button
+                    type="button"
+                    @click="deleteCertificate(index)"
+                    class="rounded-lg p-1 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900/30"
+                    title="Eliminar"
+                  >
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Añadir nuevos -->
               <input
                 type="file"
                 multiple
@@ -413,10 +473,11 @@ function deleteExperience(x) {
                 @change="onPickOtherCerts"
                 class="text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-indigo-700 hover:file:bg-indigo-100 dark:file:bg-indigo-900/30 dark:file:text-indigo-300 dark:hover:file:bg-indigo-900/50"
               />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">PDF/JPG/PNG, máx. 5 MB cada uno. Se añadirán a los existentes.</p>
             </div>
           </div>
         </div>
-        <div v-if="form.errors.avatar || form.errors.cv || form.errors.cover_letter || form.errors['other_certs.*']" 
+        <div v-if="form.errors.avatar || form.errors.cover_letter || form.errors['other_certs.*']" 
              class="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-600 dark:bg-red-900/20 dark:text-red-400">
           {{
             form.errors.avatar ||

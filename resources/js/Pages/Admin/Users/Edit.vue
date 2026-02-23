@@ -34,7 +34,8 @@ const form = useForm({
 const typeLabels = {
   student: 'Alumno',
   company: 'Empresa',
-  teacher: 'Profesor'
+  teacher: 'Profesor',
+  admin: 'Administrador'
 }
 
 const submit = () => {
@@ -95,6 +96,24 @@ const submit = () => {
               <div>
                 <label for="full_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
                   Nombre Completo
+                </label>
+                <input
+                  id="full_name"
+                  v-model="form.full_name"
+                  type="text"
+                  required
+                  class="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                />
+                <p v-if="form.errors.full_name" class="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {{ form.errors.full_name }}
+                </p>
+              </div>
+            </template>
+
+            <template v-if="type === 'admin'">
+              <div>
+                <label for="full_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  Nombre
                 </label>
                 <input
                   id="full_name"

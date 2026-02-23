@@ -42,6 +42,12 @@ const typeConfig = computed(() => {
       icon: '👨‍🏫',
       singular: 'profesor',
       color: 'orange'
+    },
+    admin: {
+      title: 'Administradores',
+      icon: '🛡️',
+      singular: 'administrador',
+      color: 'red'
     }
   }
   return configs[props.type] || configs.student
@@ -124,6 +130,17 @@ const formatDate = (date) => {
           >
             👨‍🏫 Profesores
           </Link>
+          <Link
+            :href="route('admin.users.index', { type: 'admin' })"
+            :class="[
+              'whitespace-nowrap border-b-2 py-4 px-1 text-sm font-medium',
+              type === 'admin'
+                ? 'border-indigo-500 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400'
+                : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
+            ]"
+          >
+            🛡️ Admins
+          </Link>
         </nav>
       </div>
 
@@ -151,6 +168,9 @@ const formatDate = (date) => {
                 Empresa
               </th>
               <th v-if="type === 'teacher'" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                Nombre
+              </th>
+              <th v-if="type === 'admin'" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                 Nombre
               </th>
               <th class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
@@ -182,6 +202,9 @@ const formatDate = (date) => {
                     {{ user.trade_name || user.name }}
                   </template>
                   <template v-else-if="type === 'teacher'">
+                    {{ user.full_name }}
+                  </template>
+                  <template v-else-if="type === 'admin'">
                     {{ user.full_name }}
                   </template>
                 </div>

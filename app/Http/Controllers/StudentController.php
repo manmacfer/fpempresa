@@ -186,7 +186,6 @@ class StudentController extends Controller
 
             // Ficheros (opcionales)
             'avatar'                  => ['nullable', 'image', 'max:2048'],
-            'cv'                      => ['nullable', 'file', 'max:5120'],
             'cover_letter'            => ['nullable', 'file', 'max:5120'],
             'other_certs.*'           => ['nullable', 'file', 'max:5120'],
         ]);
@@ -199,13 +198,6 @@ class StudentController extends Controller
             $data['avatar_path'] = $request->file('avatar')->store('avatars', 'public');
         }
 
-        if ($request->hasFile('cv')) {
-            if ($student->cv_path) {
-                Storage::disk('public')->delete($student->cv_path);
-            }
-            $data['cv_path'] = $request->file('cv')->store('cv', 'public');
-        }
-
         if ($request->hasFile('cover_letter')) {
             if ($student->cover_letter_path) {
                 Storage::disk('public')->delete($student->cover_letter_path);
@@ -214,11 +206,13 @@ class StudentController extends Controller
         }
 
         if ($request->hasFile('other_certs')) {
-            $paths = [];
+            // Mantener certificados existentes y añadir nuevos
+            $existingPaths = $student->other_certs_paths ?? [];
+            $newPaths = [];
             foreach ($request->file('other_certs') as $file) {
-                $paths[] = $file->store('certs', 'public');
+                $newPaths[] = $file->store('certs', 'public');
             }
-            $data['other_certs_paths'] = $paths;
+            $data['other_certs_paths'] = array_merge($existingPaths, $newPaths);
         }
 
         // Extraemos relaciones especiales
@@ -345,8 +339,8 @@ class StudentController extends Controller
 
             // ficheros
             'avatar_url'           => $s->avatar_url,
-            'cv_path'              => $s->cv_path,
             'cover_letter_path'    => $s->cover_letter_path,
+            'other_certs_paths'    => $s->other_certs_paths ?? [],
 
             // relaciones
             'educations' => $s->educations->map(fn ($e) => [
@@ -387,5 +381,41 @@ class StudentController extends Controller
         // De momento, usamos la misma estructura que en el editor.
         // Si luego quieres ocultar campos en público, los quitamos de aquí.
         return $this->toResource($s);
+    }
+
+    /**
+     * Eliminar la carta de presentación del estudiante autenticado
+     */
+    public function deleteCoverLetter(Request $request)
+    {
+        $student = Student::where('user_id', $request->user()->id)->firstOrFail();
+
+        if ($student->cover_letter_path) {
+            Storage::disk('public')->delete($student->cover_letter_path);
+            $student->cover_letter_path = null;
+            $student->save();
+        }
+
+        return redirect()->route('students.edit.me')->with('success', 'Carta de presentación eliminada.');
+    }
+
+    /**
+     * Eliminar un certificado específico por índice
+     */
+    public function deleteCertificate(Request $request)
+    {
+        $student = Student::where('user_id', $request->user()->id)->firstOrFail();
+        
+        $index = $request->input('index');
+        $paths = $student->other_certs_paths ?? [];
+
+        if (isset($paths[$index])) {
+            Storage::disk('public')->delete($paths[$index]);
+            unset($paths[$index]);
+            $student->other_certs_paths = array_values($paths); // reindexar
+            $student->save();
+        }
+
+        return redirect()->route('students.edit.me')->with('success', 'Certificado eliminado.');
     }
 }

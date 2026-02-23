@@ -82,9 +82,14 @@ const userPhoto = computed(() => {
 })
 
 // Rutas
-const myEditHref = computed(() =>
-  role.value === 'company' ? route('companies.edit.me') : route('students.edit.me')
-)
+const myEditHref = computed(() => {
+  if (role.value === 'company') return route('companies.edit.me')
+  if (role.value === 'admin') {
+    const id = page.props.auth?.id
+    return id ? route('admin.users.edit', { type: 'admin', id }) : null
+  }
+  return route('students.edit.me')
+})
 
 const myPublicHref = computed(() => {
   if (role.value === 'company' && companyId.value) {
@@ -183,23 +188,6 @@ const myPublicHref = computed(() => {
               <span class="absolute inset-0 scale-0 rounded-xl bg-gradient-to-r from-indigo-600/10 to-purple-600/10 transition-transform duration-300 group-hover:scale-100"></span>
             </Link>
 
-            <!-- TODOS: Zona de Seguimiento -->
-            <Link
-              v-if="$page.props.auth.user"
-              :href="route('seguimiento.index')"
-              class="group relative text-sm rounded-xl px-4 py-2 font-semibold transition-all duration-300
-                     text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400"
-              :class="{ 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 dark:from-indigo-950/30 dark:to-purple-950/30 dark:text-indigo-400': route().current('seguimiento.*') }"
-            >
-              <span class="relative z-10 flex items-center gap-2">
-                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
-                </svg>
-                Seguimiento
-              </span>
-              <span class="absolute inset-0 scale-0 rounded-xl bg-gradient-to-r from-indigo-600/10 to-purple-600/10 transition-transform duration-300 group-hover:scale-100"></span>
-            </Link>
-
             <!-- Vacantes SOLO para alumnos -->
             <Link
               v-if="role==='student'"
@@ -230,6 +218,40 @@ const myPublicHref = computed(() => {
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
                 Matchings
+              </span>
+              <span class="absolute inset-0 scale-0 rounded-xl bg-gradient-to-r from-indigo-600/10 to-purple-600/10 transition-transform duration-300 group-hover:scale-100"></span>
+            </Link>
+
+            <!-- TODOS: Zona de Seguimiento -->
+            <Link
+              v-if="$page.props.auth.user"
+              :href="route('seguimiento.index')"
+              class="group relative text-sm rounded-xl px-4 py-2 font-semibold transition-all duration-300
+                     text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400"
+              :class="{ 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 dark:from-indigo-950/30 dark:to-purple-950/30 dark:text-indigo-400': route().current('seguimiento.*') }"
+            >
+              <span class="relative z-10 flex items-center gap-2">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                </svg>
+                Seguimiento
+              </span>
+              <span class="absolute inset-0 scale-0 rounded-xl bg-gradient-to-r from-indigo-600/10 to-purple-600/10 transition-transform duration-300 group-hover:scale-100"></span>
+            </Link>
+
+            <!-- Plantilla CP SOLO para alumnos -->
+            <Link
+              v-if="role==='student'"
+              :href="route('student.cover-letter-template')"
+              class="group relative text-sm rounded-xl px-4 py-2 font-semibold transition-all duration-300
+                     text-gray-700 hover:text-indigo-600 dark:text-gray-300 dark:hover:text-indigo-400"
+              :class="{ 'bg-gradient-to-r from-indigo-50 to-purple-50 text-indigo-600 dark:from-indigo-950/30 dark:to-purple-950/30 dark:text-indigo-400': route().current('student.cover-letter-template') }"
+            >
+              <span class="relative z-10 flex items-center gap-2">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                Plantilla CP
               </span>
               <span class="absolute inset-0 scale-0 rounded-xl bg-gradient-to-r from-indigo-600/10 to-purple-600/10 transition-transform duration-300 group-hover:scale-100"></span>
             </Link>
@@ -428,6 +450,28 @@ const myPublicHref = computed(() => {
           </Link>
 
           <Link
+            v-if="route().has && route().has('seguimiento.index')"
+            :href="route('seguimiento.index')"
+            class="block ps-3 pe-4 py-2 text-base font-medium
+                   text-gray-600 hover:bg-gray-50 hover:text-gray-800
+                   dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
+          >
+            Seguimiento
+          </Link>
+
+          <!-- Plantilla CP SOLO alumnos en móvil -->
+          <Link
+            v-if="role==='student'"
+            :href="route('student.cover-letter-template')"
+            class="block ps-3 pe-4 py-2 text-base font-medium
+                   text-gray-600 hover:bg-gray-50 hover:text-gray-800
+                   dark:text-gray-300 dark:hover:bg-gray-800/70 dark:hover:text-gray-100"
+          >
+            Plantilla CP
+          </Link>
+
+          <Link
+            v-if="myEditHref"
             :href="myEditHref"
             class="block ps-3 pe-4 py-2 text-base font-medium
                    text-gray-600 hover:bg-gray-50 hover:text-gray-800

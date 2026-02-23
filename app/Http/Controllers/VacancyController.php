@@ -201,13 +201,16 @@ public function show(Request $request, Vacancy $vacancy)
     ]);
 }
 
-    // Editar (formulario) — solo propietario empresa.
+    // Editar (formulario) — propietario empresa o admin.
     public function edit(Request $request, Vacancy $vacancy)
     {
         $user = $request->user();
-        $company = $user->company ?? null;
-        if (! $company || $company->id !== $vacancy->company_id) {
-            abort(403);
+        $isAdmin = $user->role === 'admin' || $user->role_id === 1;
+        if (! $isAdmin) {
+            $company = $user->company ?? null;
+            if (! $company || $company->id !== $vacancy->company_id) {
+                abort(403);
+            }
         }
 
         $vacancy->load('requiredLanguages');
@@ -223,9 +226,12 @@ public function show(Request $request, Vacancy $vacancy)
     public function update(Request $request, Vacancy $vacancy): RedirectResponse
     {
         $user = $request->user();
-        $company = $user->company ?? null;
-        if (! $company || $company->id !== $vacancy->company_id) {
-            abort(403);
+        $isAdmin = $user->role === 'admin' || $user->role_id === 1;
+        if (! $isAdmin) {
+            $company = $user->company ?? null;
+            if (! $company || $company->id !== $vacancy->company_id) {
+                abort(403);
+            }
         }
 
         $validated = $request->validate([
@@ -265,21 +271,30 @@ public function show(Request $request, Vacancy $vacancy)
             $vacancy->requiredLanguages()->sync($sync);
         }
 
-        return redirect()->route('vacancies.show', $vacancy->id)->with('success', 'Vacante actualizada.');
+        $isAdmin = $user->role === 'admin' || $user->role_id === 1;
+        return $isAdmin
+            ? redirect()->route('admin.vacancies.index')->with('success', 'Vacante actualizada.')
+            : redirect()->route('vacancies.show', $vacancy->id)->with('success', 'Vacante actualizada.');
     }
 
     // Borrar vacante.
     public function destroy(Request $request, Vacancy $vacancy): RedirectResponse
     {
         $user = $request->user();
-        $company = $user->company ?? null;
-        if (! $company || $company->id !== $vacancy->company_id) {
-            abort(403);
+        $isAdmin = $user->role === 'admin' || $user->role_id === 1;
+        if (! $isAdmin) {
+            $company = $user->company ?? null;
+            if (! $company || $company->id !== $vacancy->company_id) {
+                abort(403);
+            }
         }
 
         $vacancy->delete();
 
-        return redirect()->route('vacancies.my')->with('success', 'Vacante eliminada.');
+        $isAdmin = $user->role === 'admin' || $user->role_id === 1;
+        return $isAdmin
+            ? redirect()->route('admin.vacancies.index')->with('success', 'Vacante eliminada.')
+            : redirect()->route('vacancies.my')->with('success', 'Vacante eliminada.');
     }
 
     // --------- SCORING (si lo necesitas interno) ----------

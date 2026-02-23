@@ -63,7 +63,7 @@ const hasLinks = computed(() =>
 )
 
 const hasDocuments = computed(() =>
-  props.student.avatar_url || props.student.cv_url || props.student.cover_letter_url || (props.student.other_certs && props.student.other_certs.length > 0)
+  true // Siempre mostramos la sección porque siempre hay CV autogenerado
 )
 </script>
 
@@ -173,18 +173,38 @@ const hasDocuments = computed(() =>
                 </svg>
               </a>
 
-              <a v-if="student.cover_letter_url" :href="student.cover_letter_url" target="_blank" class="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 transition-all hover:border-indigo-300 hover:bg-indigo-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-indigo-600 dark:hover:bg-indigo-900/20">
-                <svg class="h-5 w-5 text-indigo-600 dark:text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+              <!-- Carta de presentación -->
+              <a v-if="student.cover_letter_path" 
+                 :href="`/storage/${student.cover_letter_path}`" 
+                 target="_blank" 
+                 class="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4 transition-all hover:border-green-300 hover:bg-green-50 hover:scale-[1.01] dark:border-gray-700 dark:bg-gray-800 dark:hover:border-green-600 dark:hover:bg-green-900/20">
+                <div class="flex items-center gap-3">
+                  <svg class="h-6 w-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                  </svg>
+                  <span class="font-semibold text-gray-900 dark:text-white">Carta de presentación</span>
+                </div>
+                <svg class="h-5 w-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
                 </svg>
-                <span class="font-medium text-gray-900 dark:text-white">Carta de presentación</span>
               </a>
 
-              <div v-if="student.other_certs && student.other_certs.length" class="pt-1">
-                <div class="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Otros certificados</div>
+              <!-- Certificados -->
+              <div v-if="student.other_certs_paths && student.other_certs_paths.length > 0" class="pt-2">
+                <div class="mb-3 text-sm font-semibold text-gray-700 dark:text-gray-300">Certificados adicionales</div>
                 <ul class="grid gap-2 sm:grid-cols-2">
-                  <li v-for="(cert, i) in student.other_certs" :key="i" class="flex items-center gap-3 rounded-lg bg-gray-50 p-2 text-sm dark:bg-gray-800/60">
-                    <a :href="cert.url" target="_blank" class="truncate text-sm text-indigo-600 hover:underline dark:text-indigo-400">{{ cert.name || `Certificado ${i + 1}` }}</a>
+                  <li v-for="(certPath, i) in student.other_certs_paths" :key="i">
+                    <a :href="`/storage/${certPath}`" 
+                       target="_blank" 
+                       class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm transition-all hover:border-blue-300 hover:bg-blue-50 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-blue-600 dark:hover:bg-blue-900/20">
+                      <svg class="h-5 w-5 flex-shrink-0 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                      </svg>
+                      <span class="flex-1 font-medium text-gray-900 dark:text-white">Certificado {{ i + 1 }}</span>
+                      <svg class="h-4 w-4 flex-shrink-0 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                      </svg>
+                    </a>
                   </li>
                 </ul>
               </div>

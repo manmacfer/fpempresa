@@ -223,6 +223,21 @@ class AdminController extends Controller
                         'created_at' => $teacher->user->created_at,
                     ];
                 });
+        } elseif ($type === 'admin') {
+            $users = User::where(function ($q) {
+                    $q->where('role', 'admin')->orWhere('role_id', 1);
+                })
+                ->select('id', 'name', 'email', 'created_at')
+                ->get()
+                ->map(function ($admin) {
+                    return [
+                        'id' => $admin->id,
+                        'type' => 'admin',
+                        'full_name' => $admin->name,
+                        'email' => $admin->email,
+                        'created_at' => $admin->created_at,
+                    ];
+                });
         }
 
         return inertia('Admin/Users/Index', [
@@ -269,6 +284,16 @@ class AdminController extends Controller
                 'email' => $teacher->user->email,
                 'full_name' => $teacher->full_name,
             ];
+        } elseif ($type === 'admin') {
+            $admin = User::where(function ($q) {
+                    $q->where('role', 'admin')->orWhere('role_id', 1);
+                })->findOrFail($id);
+            $userData = [
+                'id' => $admin->id,
+                'type' => 'admin',
+                'email' => $admin->email,
+                'full_name' => $admin->name,
+            ];
         }
 
         return inertia('Admin/Users/Edit', [
@@ -293,6 +318,8 @@ class AdminController extends Controller
         } elseif ($type === 'company') {
             $rules['company_name'] = 'required|string|max:255';
         } elseif ($type === 'teacher') {
+            $rules['full_name'] = 'required|string|max:255';
+        } elseif ($type === 'admin') {
             $rules['full_name'] = 'required|string|max:255';
         }
 
@@ -348,6 +375,19 @@ class AdminController extends Controller
             if (!empty($validated['password'])) {
                 $user->update(['password' => Hash::make($validated['password'])]);
             }
+        } elseif ($type === 'admin') {
+            $admin = User::where(function ($q) {
+                    $q->where('role', 'admin')->orWhere('role_id', 1);
+                })->findOrFail($id);
+
+            $admin->update([
+                'name' => $validated['full_name'],
+                'email' => $validated['email'],
+            ]);
+
+            if (!empty($validated['password'])) {
+                $admin->update(['password' => Hash::make($validated['password'])]);
+            }
         }
 
         return redirect()->route('admin.users.index', ['type' => $type])->with('success', 'Usuario actualizado correctamente.');
@@ -387,6 +427,17 @@ class AdminController extends Controller
             
             $teacher->delete();
             $user->delete();
+        } elseif ($type === 'admin') {
+            $admin = User::where(function ($q) {
+                    $q->where('role', 'admin')->orWhere('role_id', 1);
+                })->findOrFail($id);
+
+            // Prevent deleting yourself
+            if ($admin->id === auth()->id()) {
+                return redirect()->back()->with('error', 'No puedes eliminar tu propia cuenta de administrador.');
+            }
+
+            $admin->delete();
         }
 
         return redirect()->route('admin.users.index', ['type' => $type])->with('success', 'Usuario eliminado correctamente.');

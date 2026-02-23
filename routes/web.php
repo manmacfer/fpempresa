@@ -88,6 +88,11 @@ Route::middleware(['auth', 'verified', 'validated.student'])->group(function () 
         // Índice de vacantes con compatibilidad (solo alumnos)
         Route::get('/vacantes', [VacancyStudentController::class, 'index'])->name('vacancies.index');
 
+        // Plantilla de carta de presentación (solo alumnos)
+        Route::get('/plantilla-cp', function () {
+            return inertia('Student/CoverLetterTemplate');
+        })->name('student.cover-letter-template');
+
         // Perfil alumno autenticado
         Route::get('/students/me', fn () => redirect()->route('students.edit.me'))->name('students.me.redirect');
         Route::get('/students/me/edit', [StudentController::class, 'editMe'])->name('students.edit.me');
@@ -105,6 +110,10 @@ Route::middleware(['auth', 'verified', 'validated.student'])->group(function () 
         Route::post('/students/me/experiences', [StudentExperienceController::class, 'store'])->name('students.experiences.store');
         Route::patch('/students/me/experiences/{experience}', [StudentExperienceController::class, 'update'])->name('students.experiences.update');
         Route::delete('/students/me/experiences/{experience}', [StudentExperienceController::class, 'destroy'])->name('students.experiences.destroy');
+
+        // Eliminar documentos del alumno
+        Route::delete('/students/me/cover-letter', [StudentController::class, 'deleteCoverLetter'])->name('students.cover-letter.delete');
+        Route::delete('/students/me/certificate', [StudentController::class, 'deleteCertificate'])->name('students.certificate.delete');
     });
 
     // --- PANEL DEL PROFESOR ---
@@ -140,9 +149,10 @@ Route::middleware(['auth'])->group(function () {
     // Enviar mensajes en conversación
     Route::post('/conversations/{conversation}/messages', [MessageController::class, 'store'])->name('conversations.messages.store');
     
-    // Subir y descargar documentos
+    // Subir, descargar y eliminar documentos
     Route::post('/matchings/{matching}/documents', [DocumentController::class, 'store'])->name('matchings.documents.store');
     Route::get('/documents/{document}/download', [DocumentController::class, 'download'])->name('documents.download');
+    Route::delete('/documents/{document}', [DocumentController::class, 'destroy'])->name('documents.destroy');
     
     // Rutas de administración (solo admins)
     Route::middleware(['admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -166,8 +176,8 @@ Route::middleware(['auth'])->group(function () {
     });
 });
 
-// Rutas para editar/actualizar/borrar vacantes (empresa propietaria)
-Route::middleware(['auth','role:company'])->group(function () {
+// Rutas para editar/actualizar/borrar vacantes (empresa propietaria o admin)
+Route::middleware(['auth','role:company,admin'])->group(function () {
     Route::get('/vacantes/{vacancy}/editar', [VacancyController::class, 'edit'])->name('vacancies.edit')->whereNumber('vacancy');
     Route::match(['put','patch'], '/vacantes/{vacancy}', [VacancyController::class, 'update'])->name('vacancies.update')->whereNumber('vacancy');
     Route::delete('/vacantes/{vacancy}', [VacancyController::class, 'destroy'])->name('vacancies.destroy')->whereNumber('vacancy');

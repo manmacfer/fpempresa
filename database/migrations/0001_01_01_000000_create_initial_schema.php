@@ -181,9 +181,8 @@ return new class extends Migration
             $table->string('link_video')->nullable();
 
             // Archivos
-            $table->string('cv_path')->nullable();
             $table->string('cover_letter_path')->nullable();
-            $table->json('other_cert_paths')->nullable();
+            $table->json('other_certs_paths')->nullable();
             $table->string('avatar_path')->nullable();
 
             $table->timestamps();

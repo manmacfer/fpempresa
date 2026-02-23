@@ -36,6 +36,12 @@ const isTeacher = computed(() => {
   return role === 'teacher' || role === 'teachers'
 })
 
+// Es admin
+const isAdmin = computed(() => {
+  const role = effectiveRole.value
+  return role === 'admin'
+})
+
 function safeRoute(name, params = {}, fallback = '/vacancies') {
   return (typeof route === 'function') ? route(name, params) : fallback
 }
@@ -93,7 +99,7 @@ function safeRoute(name, params = {}, fallback = '/vacancies') {
           <!-- Vacantes Card -->
           <Link
             v-if="!isTeacher"
-            :href="isCompany ? safeRoute('vacancies.create', {}, '/vacancies/create') : safeRoute('vacancies.index', {}, '/vacancies')"
+            :href="isAdmin ? safeRoute('admin.vacancies.index', {}, '/admin/vacancies') : isCompany ? safeRoute('vacancies.create', {}, '/vacancies/create') : safeRoute('vacancies.index', {}, '/vacancies')"
             class="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-lg border border-gray-100 dark:border-gray-700/50
                    hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
           >
@@ -127,7 +133,7 @@ function safeRoute(name, params = {}, fallback = '/vacancies') {
           <!-- Matchings Card -->
           <Link
             v-if="!isTeacher"
-            :href="isCompany ? safeRoute('matching.company', {}, '/matching') : safeRoute('matching.student', {}, '/matching')"
+            :href="isAdmin ? safeRoute('admin.matchings.index', {}, '/admin/matchings') : isCompany ? safeRoute('matching.company', {}, '/matching') : safeRoute('matching.student', {}, '/matching')"
             class="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-lg border border-gray-100 dark:border-gray-700/50
                    hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
           >
@@ -159,7 +165,7 @@ function safeRoute(name, params = {}, fallback = '/vacancies') {
           <!-- Perfil Card -->
           <Link
             v-if="!isTeacher"
-            :href="safeRoute('students.edit.me', {}, '/profile')"
+            :href="isAdmin ? safeRoute('admin.users.edit', { type: 'admin', id: page.props.auth?.id }, '/admin/users') : isCompany ? safeRoute('companies.edit.me', {}, '/companies/me/edit') : safeRoute('students.edit.me', {}, '/students/me/edit')"
             class="group relative overflow-hidden rounded-2xl bg-white dark:bg-gray-800 p-6 shadow-lg border border-gray-100 dark:border-gray-700/50
                    hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
           >

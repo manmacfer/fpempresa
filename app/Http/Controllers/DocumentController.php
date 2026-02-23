@@ -81,4 +81,32 @@ class DocumentController extends Controller
         
         return response()->download($filePath, $document->name);
     }
+
+    /**
+     * Delete a document
+     */
+    public function destroy(MatchingDocument $document)
+    {
+        $user = Auth::user();
+        $matching = $document->matching;
+        $conversation = $matching->conversation;
+
+        // Only the uploader, admins (role_id=1) or teachers (role_id=2) can delete
+        $isAdmin = $user->role === 'admin' || $user->role_id === 1;
+        $isTeacher = $user->role_id === 2;
+        $isUploader = $document->uploaded_by === $user->id;
+
+        if (!$isUploader && !$isAdmin && !$isTeacher) {
+            abort(403, 'No tienes permiso para eliminar este documento.');
+        }
+
+        // Delete file from storage
+        if (Storage::disk('public')->exists($document->file_path)) {
+            Storage::disk('public')->delete($document->file_path);
+        }
+
+        $document->delete();
+
+        return back()->with('success', 'Documento eliminado correctamente.');
+    }
 }

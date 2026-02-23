@@ -161,10 +161,10 @@ const submit = () => {
 
         <div class="space-y-4">
           <!-- Mostrar errores generales -->
-          <div v-if="Object.keys(activeactiveForm.errors).length > 0" class="rounded-lg bg-red-50 border border-red-200 p-4 dark:bg-red-900/20 dark:border-red-800">
+          <div v-if="Object.keys(activeForm.errors).length > 0" class="rounded-lg bg-red-50 border border-red-200 p-4 dark:bg-red-900/20 dark:border-red-800">
             <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Errores en el formulario:</h3>
             <ul class="list-disc list-inside text-sm text-red-700 dark:text-red-400 space-y-1">
-              <li v-for="(error, field) in activeactiveForm.errors" :key="field">
+              <li v-for="(error, field) in activeForm.errors" :key="field">
                 <strong>{{ field }}:</strong> {{ error }}
               </li>
             </ul>
@@ -182,8 +182,8 @@ const submit = () => {
               required
               class="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
             />
-            <p v-if="activeactiveForm.errors.email" class="mt-1 text-sm text-red-600 dark:text-red-400">
-              {{ activeactiveForm.errors.email }}
+            <p v-if="activeForm.errors.email" class="mt-1 text-sm text-red-600 dark:text-red-400">
+              {{ activeForm.errors.email }}
             </p>
           </div>
 
@@ -218,8 +218,8 @@ const submit = () => {
                   required
                   class="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                 />
-                <p v-if="activeactiveForm.errors.last_name" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {{ activeactiveForm.errors.last_name }}
+                <p v-if="activeForm.errors.last_name" class="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {{ activeForm.errors.last_name }}
                 </p>
               </div>
             </div>
@@ -269,8 +269,8 @@ const submit = () => {
                   <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                     Este número será usado por los alumnos para registrarse
                   </p>
-                  <p v-if="activeactiveForm.errors.classroom_number" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {{ activeactiveForm.errors.classroom_number }}
+                  <p v-if="activeForm.errors.classroom_number" class="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {{ activeForm.errors.classroom_number }}
                   </p>
                 </div>
 
@@ -286,8 +286,8 @@ const submit = () => {
                     placeholder="Ej: 2º DAW A, 1º DAM B, etc."
                     class="mt-1 block w-full rounded-lg border border-gray-300 px-4 py-2 text-gray-900 focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
                   />
-                  <p v-if="activeactiveForm.errors.classroom_name" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {{ activeactiveForm.errors.classroom_name }}
+                  <p v-if="activeForm.errors.classroom_name" class="mt-1 text-sm text-red-600 dark:text-red-400">
+                    {{ activeForm.errors.classroom_name }}
                   </p>
                 </div>
               </div>
@@ -307,8 +307,8 @@ const submit = () => {
                     {{ classroom.classroom_number }} - {{ classroom.nombre }}
                   </option>
                 </select>
-                <p v-if="activeactiveForm.errors.classroom_id" class="mt-1 text-sm text-red-600 dark:text-red-400">
-                  {{ activeactiveForm.errors.classroom_id }}
+                <p v-if="activeForm.errors.classroom_id" class="mt-1 text-sm text-red-600 dark:text-red-400">
+                  {{ activeForm.errors.classroom_id }}
                 </p>
               </div>
             </div>
